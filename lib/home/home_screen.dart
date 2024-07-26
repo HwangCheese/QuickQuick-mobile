@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../calendar/calendar_screen.dart';
 import '../friends_list/friends_list_screen.dart';
 import '../write_memo/write_memo_screen.dart';
@@ -18,7 +20,34 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchMemos(); // user의 메모 데이터를 가져오는 함수 호출
     searchResults = memos; // 초기 검색 결과는 전체 메모로 설정
+  }
+
+  Future<void> _fetchMemos() async {
+    final url = Uri.parse('$SERVER_IP/data/$USER_ID');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        setState(() {
+          memos = data.map((item) {
+            return {
+              'text': item['data_txt'],
+              'color': Colors.grey.value,
+              'isPinned': false,
+              'originalIndex': memos.length, // 원래 인덱스 설정
+            };
+          }).toList();
+          searchResults = memos;
+          print(memos);
+        });
+      } else {
+        print('Failed to load memos: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Failed to load memos: $e');
+    }
   }
 
   void _showMenu(BuildContext context, int index) {
