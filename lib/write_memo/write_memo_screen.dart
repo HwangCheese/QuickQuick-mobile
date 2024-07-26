@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart'; // 권한 요청
 
 import 'package:http/http.dart' as http; // HTTP 요청
 import 'dart:convert'; // JSON 인코딩
+import 'package:sticker_memo/globals.dart';
 
 class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
@@ -82,7 +83,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   // }
 
   Future<void> _saveMemoToServer() async {
-    final url = Uri.parse('http://223.194.157.43:3000/data'); // 서버 주소
+    final url = Uri.parse('$SERVER_IP/data'); // 서버 주소
     final response = await http.post(
       url,
       headers: {

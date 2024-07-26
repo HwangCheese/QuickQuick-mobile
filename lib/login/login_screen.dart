@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sticker_memo/home/home_screen.dart';
+import 'package:sticker_memo/globals.dart';
 
 void main() {
   runApp(MyApp());
@@ -47,6 +48,7 @@ class _LogInState extends State<LogIn> {
   Future<void> loginUser(String userid, String password) async {
     if (userid == '1111' && password == '1111') {
       // 로컬에서 ID와 PW가 1111인 경우
+      USER_ID=userid;
       await _saveLoginStatus(true);
       Navigator.push(
         context,
@@ -55,7 +57,7 @@ class _LogInState extends State<LogIn> {
       return;
     }
 
-    final url = Uri.parse('http://223.194.157.43:3000/login');
+    final url = Uri.parse('$SERVER_IP/login');
     try {
       final response = await http.post(
         url,
@@ -69,6 +71,7 @@ class _LogInState extends State<LogIn> {
       );
 
       if (response.statusCode == 200) {
+        USER_ID=userid;
         await _saveLoginStatus(true);
         Navigator.push(
           context,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../calendar/calendar_screen.dart';
 import '../friends_list/friends_list_screen.dart';
 import '../write_memo/write_memo_screen.dart';
+import 'package:sticker_memo/globals.dart';
 
 class HomeScreen extends StatefulWidget {
   @override

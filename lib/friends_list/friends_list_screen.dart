@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sticker_memo/globals.dart';
 
 class FriendsListScreen extends StatefulWidget {
   @override
