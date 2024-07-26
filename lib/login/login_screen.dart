@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // http 패키지 추가
+import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:sticker_memo/home/home_screen.dart'; // json 데이터로 인코딩을 도와주는 라이브러리
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sticker_memo/home/home_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -11,8 +12,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: LogIn(),
+      home: FutureBuilder<bool>(
+        future: _checkLoginStatus(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasData && snapshot.data == true) {
+            return HomeScreen();
+          } else {
+            return LogIn();
+          }
+        },
+      ),
     );
+  }
+
+  Future<bool> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('isLoggedIn') ?? false;
   }
 }
 
@@ -27,10 +44,10 @@ class _LogInState extends State<LogIn> {
   TextEditingController controller = TextEditingController();
   TextEditingController controller2 = TextEditingController();
 
-  // 로그인 입니다.
-  Future<void> loginUser(String userNumber, String password) async {
-    if (userNumber == '1111' && password == '1111') {
+  Future<void> loginUser(String userid, String password) async {
+    if (userid == '1111' && password == '1111') {
       // 로컬에서 ID와 PW가 1111인 경우
+      await _saveLoginStatus(true);
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -38,22 +55,21 @@ class _LogInState extends State<LogIn> {
       return;
     }
 
-    final url = Uri.parse('http://223.194.130.27:3000/login');
+    final url = Uri.parse('http://223.194.157.43:3000/login');
     try {
       final response = await http.post(
-        // post 요청을 서버로 전송할게요~
         url,
         headers: {
-          'Content-Type': 'application/json', // json 타입으로
+          'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'user_number': userNumber,
+          'user_id': userid,
           'user_pw': password,
         }),
       );
 
-      // 밑의 코드는 오류검증 코드인데 아직 작동을 확인하지는 못함
       if (response.statusCode == 200) {
+        await _saveLoginStatus(true);
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -65,6 +81,11 @@ class _LogInState extends State<LogIn> {
     } catch (e) {
       showSnackBar(context, Text('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.'));
     }
+  }
+
+  Future<void> _saveLoginStatus(bool isLoggedIn) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', isLoggedIn);
   }
 
   @override

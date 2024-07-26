@@ -2,9 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // 이미지 선택
 import 'package:file_picker/file_picker.dart'; // 파일 선택
-import 'package:flutter_sound/flutter_sound.dart'; // 음성 녹음
+// import 'package:flutter_sound/flutter_sound.dart'; // 음성 녹음
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart'; // 권한 요청
+
+import 'package:http/http.dart' as http; // HTTP 요청
+import 'dart:convert'; // JSON 인코딩
 
 class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
@@ -77,6 +80,34 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   //     print("녹음 시작/중지 오류: $e");
   //   }
   // }
+
+  Future<void> _saveMemoToServer() async {
+    final url = Uri.parse('http://223.194.157.43:3000/data'); // 서버 주소
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({
+        'userId': '01011112222',
+        'format': 'txt',
+        'date': DateTime.now().toIso8601String(),
+        'isOpen': true,
+        'theme': _backgroundColor.value,
+        'posX': 500,
+        'posY': 500,
+        'width': 100,
+        'height': 100,
+        'data_txt': _controller.text,
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      print('메모 저장 성공');
+    } else {
+      print('메모 저장 실패: ${response.statusCode}');
+    }
+  }
 
   void _showColorPicker() {
     showModalBottomSheet(
@@ -206,7 +237,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       appBar: AppBar(
         backgroundColor: Color(0xFFE2F1FF),
         leading: BackButton(
-          onPressed: () {
+          onPressed: () async {
+            await _saveMemoToServer();
             Navigator.pop(context, {
               'text': _controller.text,
               'color': _backgroundColor.value,
@@ -243,7 +275,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             Row(
               mainAxisAlignment:
                   MainAxisAlignment.spaceEvenly, // 아이콘 버튼들을 균등하게 배치
-              children: <Widget>[
+              children: [
                 IconButton(
                   iconSize: 45.0,
                   icon: const Icon(CupertinoIcons.paintbrush),
