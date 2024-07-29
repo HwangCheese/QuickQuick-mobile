@@ -13,8 +13,9 @@ import 'package:sticker_memo/globals.dart';
 class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
   final Color? initialColor;
+  final String? initialDataId;
 
-  WriteMemoScreen({this.initialText, this.initialColor});
+  WriteMemoScreen({this.initialText, this.initialColor, this.initialDataId});   // 기존 데이터 삭제를 위한 데이터 아이디 전달 추가 !!
 
   @override
   _WriteMemoScreenState createState() => _WriteMemoScreenState();
@@ -37,6 +38,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
     if (widget.initialColor != null) {
       _backgroundColor = widget.initialColor!;
+    }
+    if (widget.initialDataId != null) {
+      _deleteMemoFromServer(widget.initialDataId!);
+    }
+  }
+
+  Future<void> _deleteMemoFromServer(String dataId) async {  // 메모 삭제요청 전송
+    final url = Uri.parse('$SERVER_IP/data/$dataId');
+    final response = await http.delete(url);
+    if (response.statusCode == 200) {
+      print('메모 삭제 성공');
+    } else {
+      print('메모 삭제 실패: ${response.statusCode}');
     }
   }
 
@@ -90,12 +104,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         'Content-Type': 'application/json',
       },
       body: json.encode({
-        'userId': '01011112222',
+        'userId': USER_ID,
         'format': 'txt',
         'date': DateTime.now().toIso8601String(),
         'isOpen': true,
         'theme': _backgroundColor.value,
-        'posX': 500,
+        'posX': 500,    //우선은 디폴트값 500,500,100,100 으로 ..
         'posY': 500,
         'width': 100,
         'height': 100,
@@ -109,6 +123,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       print('메모 저장 실패: ${response.statusCode}');
     }
   }
+
 
   void _showColorPicker() {
     showModalBottomSheet(

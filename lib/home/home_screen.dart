@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'text': item['data_txt'],
               'color': Colors.grey.value,
               'isPinned': false,
+              'dataId' : item['dataId'],
               'originalIndex': memos.length, // 원래 인덱스 설정
             };
           }).toList();
@@ -47,6 +48,24 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('Failed to load memos: $e');
+    }
+  }
+
+  Future<void> _deleteMemoFromServer(String dataId) async {
+    if (dataId == null) return;
+
+    final url = Uri.parse('$SERVER_IP/data/$dataId');
+    final response = await http.delete(url);
+
+    if (response.statusCode == 200) {
+      print('메모 삭제 성공');
+      setState(() {
+        // 서버에서 메모가 삭제되었으므로, 로컬에서도 삭제
+        memos.removeWhere((memo) => memo['dataId'] == dataId);
+        searchResults = memos; // 검색 결과도 업데이트
+      });
+    } else {
+      print('메모 삭제 실패: ${response.statusCode}');
     }
   }
 
@@ -85,8 +104,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 leading: Icon(Icons.delete),
                 title: Text('삭제'),
                 onTap: () {
+                  String dataId = memos[index]['dataId'];
                   setState(() {
                     memos.removeAt(index);
+                    _deleteMemoFromServer(dataId);
                     _searchMemo(_controller.text);
                   });
                   Navigator.pop(context);
@@ -158,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => WriteMemoScreen(
           initialText: memos[index]['text'],
           initialColor: Color(memos[index]['color']),
+          initialDataId: memos[index]['dataId'],  // 데이터아이디 전송 추가
         ),
       ),
     );
