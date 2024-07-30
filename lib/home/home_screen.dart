@@ -19,6 +19,14 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isSelectionMode = false;
   Set<int> selectedMemos = Set<int>();
 
+  Map<String, Color> colorMap = {
+    'pink': Colors.pink[100]!,
+    'blue': Colors.blue[100]!,
+    'green': Colors.green[100]!,
+    'orange': Colors.orange[100]!,
+    'yellow': Colors.yellow[100]!,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -36,7 +44,8 @@ class _HomeScreenState extends State<HomeScreen> {
           memos = data.map((item) {
             return {
               'text': item['data_txt'],
-              'color': Colors.grey.value,
+              'color': colorMap[item['theme']] ??
+                  Colors.white, // 서버에서 불러온 색상 이름을 색상 값으로 변환
               'isPinned': false,
               'dataId': item['dataId'],
               'originalIndex': memos.length, // 원래 인덱스 설정
@@ -116,9 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (response.statusCode == 200) {
       print('메모 삭제 성공');
       setState(() {
-        // 서버에서 메모가 삭제되었으므로, 로컬에서도 삭제
         memos.removeWhere((memo) => memo['dataId'] == dataId);
-        searchResults = memos; // 검색 결과도 업데이트
+        searchResults = memos;
       });
     } else {
       print('메모 삭제 실패: ${response.statusCode}');
@@ -183,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (context) => WriteMemoScreen(
           initialText: memos[index]['text'],
-          initialColor: Color(memos[index]['color']),
+          initialColor: memos[index]['color'],
           initialDataId: memos[index]['dataId'],
         ),
       ),
@@ -191,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (result != null && result['text'].isNotEmpty) {
       setState(() {
         memos[index] = result;
-        _searchMemo(_controller.text); // 업데이트된 메모로 검색 결과 갱신
+        _searchMemo(_controller.text);
       });
     }
   }
@@ -215,12 +223,68 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _selectAllMemos() {
+    setState(() {
+      if (selectedMemos.length == searchResults.length) {
+        selectedMemos.clear();
+      } else {
+        selectedMemos = Set<int>.from(
+            List<int>.generate(searchResults.length, (index) => index));
+      }
+    });
+  }
+
+  void _deleteSelectedMemos() {
+    setState(() {
+      selectedMemos.forEach((index) {
+        String dataId = memos[index]['dataId'];
+        _deleteMemoFromServer(dataId);
+      });
+      selectedMemos.clear();
+      isSelectionMode = false;
+    });
+  }
+
+  void _shareSelectedMemos() {
+    print("Sharing selected memos");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight),
+        child: AppBar(
+          title:
+              isSelectionMode ? Text('${selectedMemos.length} selected') : null,
+          backgroundColor: Colors.transparent,
+          leading: isSelectionMode
+              ? IconButton(
+                  icon: Icon(Icons.close),
+                  onPressed: _toggleSelectionMode,
+                )
+              : null,
+          actions: isSelectionMode
+              ? [
+                  IconButton(
+                    icon: Icon(Icons.select_all),
+                    onPressed: _selectAllMemos,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.share),
+                    onPressed: _shareSelectedMemos,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: _deleteSelectedMemos,
+                  ),
+                ]
+              : null,
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.only(
-            top: 150.0, left: 16.0, right: 16.0, bottom: 16.0),
+            top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
@@ -290,8 +354,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              onSubmitted: (text) {
-                _searchMemo(text);
+              onChanged: (text) {
+                _searchMemo(text); // 검색어가 변경될 때마다 호출
               },
             ),
             SizedBox(height: 16.0),
@@ -309,8 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return GestureDetector(
                     onTap: isSelectionMode
                         ? () => _toggleMemoSelection(index)
-                        : () =>
-                            _editMemo(context, index), // 메모를 클릭하면 편집 화면으로 이동
+                        : () => _editMemo(context, index),
                     onLongPress: () => _showMenu(context, index),
                     child: Stack(
                       children: [
@@ -319,6 +382,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8.0),
                             border: Border.all(color: Colors.grey),
+                            color: searchResults[index]['color'] ??
+                                Colors.white, // 배경 색상 적용
                           ),
                           child: Center(
                             child: Text(

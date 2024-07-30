@@ -16,10 +16,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    // 임시 일정 데이터 추가
+    // Temporary event data
     _events = {
-      DateTime.utc(2024, 7, 27): ['3시 교수님 미팅'],
-      DateTime.utc(2024, 7, 28): ['7시 동아리 회식'],
+      DateTime.utc(2024, 7, 27): ['3시 교수님 미팅', '5시 팀 회의', '10시 회식'],
+      DateTime.utc(2024, 7, 28): ['7시 동아리 회식', '2시 개인 공부'],
     };
   }
 
@@ -27,11 +27,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return _events[day] ?? [];
   }
 
+  List<String> _sortEvents(List<String> events) {
+    events.sort((a, b) {
+      final aTime = int.parse(a.split('시')[0]);
+      final bTime = int.parse(b.split('시')[0]);
+      return aTime.compareTo(bTime);
+    });
+    return events;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final events = _sortEvents(_getEventsForDay(_selectedDay ?? _focusedDay));
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Calendar'),
+        title: Text('캘린더'),
       ),
       body: Padding(
         padding: const EdgeInsets.only(
@@ -75,7 +86,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           height: 7,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.blue, // 마커 색상
+                            color: Colors.blue, // Marker color
                           ),
                         ),
                       );
@@ -101,9 +112,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            ..._getEventsForDay(_selectedDay ?? _focusedDay).map(
-              (event) => ListTile(
-                title: Text(event),
+            Expanded(
+              child: ListView.builder(
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  final event = events[index];
+                  final time = event.split(' ')[0];
+                  final description = event.split(' ')[1];
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10.0),
+                    child: Row(
+                      children: [
+                        Text(
+                          time,
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(description),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],

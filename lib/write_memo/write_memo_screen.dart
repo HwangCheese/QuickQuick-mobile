@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:sticker_memo/globals.dart';
@@ -26,6 +25,7 @@ class WriteMemoScreen extends StatefulWidget {
 class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final TextEditingController _controller = TextEditingController();
   Color _backgroundColor = Colors.white;
+  final FocusNode _focusNode = FocusNode();
 
   final ImagePicker _picker = ImagePicker();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
@@ -33,6 +33,21 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String? _audioPath;
   String? _imagePath;
   String? _filePath;
+
+  Map<String, Color> colorMap = {
+    'pink': Colors.pink[100]!,
+    'blue': Colors.blue[100]!,
+    'green': Colors.green[100]!,
+    'orange': Colors.orange[100]!,
+    'yellow': Colors.yellow[100]!,
+  };
+
+  String getColorName(Color color) {
+    return colorMap.entries
+        .firstWhere((entry) => entry.value == color,
+            orElse: () => MapEntry('white', Colors.white))
+        .key;
+  }
 
   @override
   void initState() {
@@ -50,7 +65,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _deleteMemoFromServer(String dataId) async {
-    // 메모 삭제요청 전송
     final url = Uri.parse('$SERVER_IP/data/$dataId');
     final response = await http.delete(url);
     if (response.statusCode == 200) {
@@ -80,16 +94,16 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       },
       body: json.encode({
         'userId': USER_ID,
-        'format': 'txt', // 텍스트인지 이미지 파일인지 구분 필요
+        'format': 'txt',
         'date': DateTime.now().toIso8601String(),
         'isOpen': true,
-        'theme': _backgroundColor.value, // 메모 배경색
+        'theme': getColorName(_backgroundColor), // 메모 배경색 이름
         'posX': 500,
         'posY': 500,
         'width': 100,
         'height': 100,
         'data_txt': _controller.text,
-        'audio_path': _audioPath, // 녹음한 파일
+        'audio_path': _audioPath,
       }),
     );
 
@@ -126,6 +140,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 ].map((Color color) {
                   return GestureDetector(
                     onTap: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
                       setState(() {
                         _backgroundColor = color;
                       });
@@ -266,6 +281,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Color(0xFFE2F1FF),
       appBar: AppBar(
         backgroundColor: Color(0xFFE2F1FF),
@@ -274,94 +290,109 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             await _saveMemoToServer();
             Navigator.pop(context, {
               'text': _controller.text,
-              'color': _backgroundColor.value,
+              'color': _backgroundColor,
               'isPinned': false,
             });
           },
         ),
         title: Text('메모 작성'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            SizedBox(
-              width: screenWidth * 0.9,
-              height: screenHeight * 0.55,
-              child: Stack(
-                children: [
-                  TextField(
-                    controller: _controller,
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: _backgroundColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  if (_imagePath != null)
-                    Positioned.fill(
-                      child: Image.file(
-                        File(_imagePath!),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  if (_filePath != null)
-                    Positioned(
-                      bottom: 10,
-                      left: 10,
-                      child: Container(
-                        color: Colors.white,
-                        padding: EdgeInsets.all(8.0),
-                        child: Text(
-                          'File attached: ${_filePath!.split('/').last}',
-                          style: TextStyle(color: Colors.black),
+      body: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus(); // 키보드 내리기
+        },
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                SizedBox(
+                  width: screenWidth * 0.9,
+                  height: screenHeight * 0.6,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        top: 20, // 원하는 만큼 아래로 내리기
+                        left: 0,
+                        right: 0,
+                        bottom: 0, // 공간을 확보하여 TextField가 Stack 내에서 위치를 유지
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: _backgroundColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
                         ),
                       ),
+                      if (_imagePath != null)
+                        Positioned.fill(
+                          child: Image.file(
+                            File(_imagePath!),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      if (_filePath != null)
+                        Positioned(
+                          bottom: 10,
+                          left: 10,
+                          child: Container(
+                            color: Colors.white,
+                            padding: EdgeInsets.all(8.0),
+                            child: Text(
+                              'File attached: ${_filePath!.split('/').last}',
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 70.0),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      iconSize: 45.0,
+                      icon: const Icon(CupertinoIcons.paintbrush),
+                      onPressed: _showColorPicker,
                     ),
-                ],
-              ),
-            ),
-            SizedBox(height: 50.0),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  iconSize: 45.0,
-                  icon: const Icon(CupertinoIcons.paintbrush),
-                  onPressed: _showColorPicker,
-                ),
-                IconButton(
-                  iconSize: 45.0,
-                  icon: const Icon(Icons.attach_file),
-                  onPressed: _pickImageOrFile,
-                ),
-                IconButton(
-                  iconSize: 45.0,
-                  icon: _isRecording
-                      ? Icon(Icons.stop, color: Colors.red)
-                      : Icon(CupertinoIcons.mic),
-                  onPressed: _isRecording ? _stopRecording : _startRecording,
-                ),
-                IconButton(
-                  iconSize: 45.0,
-                  icon: const Icon(Icons.edit_note),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  iconSize: 45.0,
-                  icon: const Icon(Icons.send_rounded),
-                  onPressed: () {},
+                    IconButton(
+                      iconSize: 45.0,
+                      icon: const Icon(Icons.attach_file),
+                      onPressed: _pickImageOrFile,
+                    ),
+                    IconButton(
+                      iconSize: 45.0,
+                      icon: _isRecording
+                          ? Icon(Icons.stop, color: Colors.red)
+                          : Icon(CupertinoIcons.mic),
+                      onPressed:
+                          _isRecording ? _stopRecording : _startRecording,
+                    ),
+                    IconButton(
+                      iconSize: 45.0,
+                      icon: const Icon(Icons.edit_note),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      iconSize: 45.0,
+                      icon: const Icon(Icons.send_rounded),
+                      onPressed: () {},
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
