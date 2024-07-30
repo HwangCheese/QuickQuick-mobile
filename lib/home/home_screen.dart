@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../calendar/calendar_screen.dart';
@@ -16,6 +16,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
   List<Map<String, dynamic>> memos = [];
   List<Map<String, dynamic>> searchResults = [];
+  bool isSelectionMode = false;
+  Set<int> selectedMemos = Set<int>();
 
   @override
   void initState() {
@@ -36,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'text': item['data_txt'],
               'color': Colors.grey.value,
               'isPinned': false,
-              'dataId' : item['dataId'],
+              'dataId': item['dataId'],
               'originalIndex': memos.length, // 원래 인덱스 설정
             };
           }).toList();
@@ -48,24 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('Failed to load memos: $e');
-    }
-  }
-
-  Future<void> _deleteMemoFromServer(String dataId) async {
-    if (dataId == null) return;
-
-    final url = Uri.parse('$SERVER_IP/data/$dataId');
-    final response = await http.delete(url);
-
-    if (response.statusCode == 200) {
-      print('메모 삭제 성공');
-      setState(() {
-        // 서버에서 메모가 삭제되었으므로, 로컬에서도 삭제
-        memos.removeWhere((memo) => memo['dataId'] == dataId);
-        searchResults = memos; // 검색 결과도 업데이트
-      });
-    } else {
-      print('메모 삭제 실패: ${response.statusCode}');
     }
   }
 
@@ -89,7 +73,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: Text('복사'),
                 onTap: () {
                   Navigator.pop(context);
-                  // 복사 기능 추가 가능
+                  Clipboard.setData(ClipboardData(text: memos[index]['text']));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('메모가 클립보드에 복사되었습니다.')),
+                  );
                 },
               ),
               ListTile(
@@ -118,6 +105,24 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _deleteMemoFromServer(String dataId) async {
+    if (dataId == null) return;
+
+    final url = Uri.parse('$SERVER_IP/data/$dataId');
+    final response = await http.delete(url);
+
+    if (response.statusCode == 200) {
+      print('메모 삭제 성공');
+      setState(() {
+        // 서버에서 메모가 삭제되었으므로, 로컬에서도 삭제
+        memos.removeWhere((memo) => memo['dataId'] == dataId);
+        searchResults = memos; // 검색 결과도 업데이트
+      });
+    } else {
+      print('메모 삭제 실패: ${response.statusCode}');
+    }
   }
 
   void _togglePin(int index) {
@@ -179,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => WriteMemoScreen(
           initialText: memos[index]['text'],
           initialColor: Color(memos[index]['color']),
-          initialDataId: memos[index]['dataId'],  // 데이터아이디 전송 추가
+          initialDataId: memos[index]['dataId'],
         ),
       ),
     );
@@ -189,6 +194,25 @@ class _HomeScreenState extends State<HomeScreen> {
         _searchMemo(_controller.text); // 업데이트된 메모로 검색 결과 갱신
       });
     }
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      isSelectionMode = !isSelectionMode;
+      if (!isSelectionMode) {
+        selectedMemos.clear();
+      }
+    });
+  }
+
+  void _toggleMemoSelection(int index) {
+    setState(() {
+      if (selectedMemos.contains(index)) {
+        selectedMemos.remove(index);
+      } else {
+        selectedMemos.add(index);
+      }
+    });
   }
 
   @override
@@ -207,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icon(Icons.more_vert, size: 35.0),
                   onSelected: (int result) {
                     if (result == 0) {
-                      // 선택 기능 추가 가능
+                      _toggleSelectionMode();
                     } else if (result == 1) {
                       _navigateToCalendar(context);
                     } else if (result == 2) {
@@ -235,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
             TextField(
               controller: _controller,
               decoration: InputDecoration(
-                hintText: '검색…',
+                hintText: 'Search...',
                 prefixIcon: Icon(Icons.search),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
@@ -281,23 +305,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
+                  bool isSelected = selectedMemos.contains(index);
                   return GestureDetector(
-                    onTap: () =>
-                        _editMemo(context, index), // 메모를 클릭하면 편집 화면으로 이동
+                    onTap: isSelectionMode
+                        ? () => _toggleMemoSelection(index)
+                        : () =>
+                            _editMemo(context, index), // 메모를 클릭하면 편집 화면으로 이동
                     onLongPress: () => _showMenu(context, index),
                     child: Stack(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(16.0),
                           decoration: BoxDecoration(
-                            color: Color(searchResults[index]['color']),
                             borderRadius: BorderRadius.circular(8.0),
                             border: Border.all(color: Colors.grey),
                           ),
                           child: Center(
                             child: Text(
                               searchResults[index]['text'],
-                              style: TextStyle(fontSize: 16.0),
+                              style: TextStyle(
+                                fontSize: 16.0,
+                              ),
                             ),
                           ),
                         ),
@@ -308,6 +336,34 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Icon(
                               Icons.push_pin,
                               color: Colors.grey,
+                            ),
+                          ),
+                        if (isSelectionMode)
+                          Positioned(
+                            top: 8.0,
+                            left: 8.0,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.blue[400]
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.transparent
+                                      : Colors.grey,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.check,
+                                size: 16,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.transparent,
+                              ),
                             ),
                           ),
                       ],

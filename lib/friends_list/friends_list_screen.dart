@@ -35,6 +35,31 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     });
   }
 
+  void _showMenu(BuildContext context, int index) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: Icon(Icons.delete),
+                title: Text('삭제'),
+                onTap: () {
+                  setState(() {
+                    friends.removeAt(index);
+                    _filterFriends();
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,8 +107,11 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             child: ListView.builder(
               itemCount: filteredFriends.length,
               itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(filteredFriends[index]),
+                return GestureDetector(
+                  onLongPress: () => _showMenu(context, index),
+                  child: ListTile(
+                    title: Text(filteredFriends[index]),
+                  ),
                 );
               },
             ),
