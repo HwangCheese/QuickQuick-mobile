@@ -18,8 +18,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     // Temporary event data
     _events = {
-      DateTime.utc(2024, 7, 27): ['3시 교수님 미팅', '5시 팀 회의', '10시 회식'],
-      DateTime.utc(2024, 7, 28): ['7시 동아리 회식', '2시 개인 공부'],
+      DateTime.utc(2024, 7, 27): [
+        '오후 3시 교수님 미팅 신난당',
+        '오후 5시 팀 회의',
+        '오후 10시 회식'
+      ],
+      DateTime.utc(2024, 7, 28): ['오후 7시 동아리 회식', '오전 2시 개인 공부'],
     };
   }
 
@@ -29,11 +33,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<String> _sortEvents(List<String> events) {
     events.sort((a, b) {
-      final aTime = int.parse(a.split('시')[0]);
-      final bTime = int.parse(b.split('시')[0]);
+      final aTime = _convertTo24HourFormat(a.split(' ')[0], a.split(' ')[1]);
+      final bTime = _convertTo24HourFormat(b.split(' ')[0], b.split(' ')[1]);
       return aTime.compareTo(bTime);
     });
     return events;
+  }
+
+  int _convertTo24HourFormat(String period, String time) {
+    final hour = int.parse(time.split('시')[0]);
+    if (period == '오후' && hour != 12) {
+      return hour + 12;
+    } else if (period == '오전' && hour == 12) {
+      return 0;
+    }
+    return hour;
   }
 
   @override
@@ -117,15 +131,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 itemCount: events.length,
                 itemBuilder: (context, index) {
                   final event = events[index];
-                  final time = event.split(' ')[0];
-                  final description = event.split(' ')[1];
+                  final parts = event.split(' ');
+                  final period = parts[0];
+                  final time = parts[1];
+                  final description = parts.sublist(2).join(' ');
+                  final formattedTime = _convertTo24HourFormat(period, time);
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10.0),
                     child: Row(
                       children: [
                         Text(
-                          time,
+                          '$formattedTime시',
                           style: TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.bold,
