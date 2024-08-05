@@ -90,6 +90,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     var url = Uri.parse('$SERVER_IP/data');
     final Map<String, dynamic> body = {
       'userId': USER_ID,
+      'format': 'txt',
       'date': DateTime.now().toIso8601String(),
       'isOpen': true,
       'theme': getColorName(_backgroundColor),
@@ -102,7 +103,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     };
 
     if (_isImageSelected) {
-      body['image_path'] = _imagePath!;
+      final fileExtension = _imagePath!.split('.').last;
+      body['format'] = fileExtension;
+      print(fileExtension);
       await _uploadImage(_imagePath!, body);
     } else if (_filePath != null) {
       final file = File(_filePath!);
@@ -138,12 +141,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     request.files.add(await http.MultipartFile.fromPath('file', imagePath));
 
     final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    final responseData = jsonDecode(responseBody);
+    final uploadedImagePath = responseData['path'];
 
     if (response.statusCode == 201) {
-      final responseBody = await response.stream.bytesToString();
-      final responseData = jsonDecode(responseBody);
-      final uploadedImagePath = responseData['path'];
-      body['image_path'] = uploadedImagePath; // 이미지 경로를 body에 추가
       print('이미지 업로드 성공');
     } else {
       print('이미지 업로드 실패: ${response.statusCode}');
@@ -337,7 +339,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     title: Text(friends[index]['user_name']!),
                     onTap: () {
                       Navigator.pop(context);
-                      // You can add functionality here if needed
                     },
                   );
                 },
