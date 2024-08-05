@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
 import '../calendar/calendar_screen.dart';
 import '../friends_list/friends_list_screen.dart';
 import '../write_memo/write_memo_screen.dart';
@@ -43,12 +44,13 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           memos = data.map((item) {
             return {
+              'format': item['format'],
+              'imagePath': item['path'],
               'text': item['data_txt'],
               'color': colorMap[item['theme']] ?? Colors.white,
               'isPinned': false,
               'dataId': item['dataId'],
               'originalIndex': memos.length,
-              'imageUrl': item['image_path'],
             };
           }).toList();
           searchResults = memos;
@@ -160,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: Text(friends[index]['user_name']!),
                     onTap: () {
                       Navigator.pop(context);
-                      // You can add functionality here if needed
+                      // 추가 기능 필요 시 여기에 작성
                     },
                   );
                 },
@@ -313,6 +315,22 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<Uint8List?> _getImage(String id) async {
+    final url = Uri.parse("$SERVER_IP/media/$USER_ID/$id");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        print('Failed to load image: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('이미지 불러오기 실패: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -455,13 +473,29 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  if (searchResults[index]['imageUrl'] !=
-                                          null &&
-                                      searchResults[index]['imageUrl'] != '')
-                                    Image.network(
-                                      searchResults[index]['imageUrl'],
-                                      fit: BoxFit.cover,
-                                      height: 50,
+                                  if (searchResults[index]['format'] != 'txt')
+                                    FutureBuilder<Uint8List?>(
+                                      future: _getImage(
+                                          searchResults[index]['dataId']),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.done) {
+                                          if (snapshot.hasData) {
+                                            return AspectRatio(
+                                              aspectRatio: 1, // 가로 세로 비율 조절
+                                              child: Image.memory(
+                                                snapshot.data!,
+                                                fit: BoxFit
+                                                    .cover, // 이미지가 컨테이너에 맞게 조절
+                                              ),
+                                            );
+                                          } else {
+                                            return Text('이미지를 불러올 수 없습니다.');
+                                          }
+                                        } else {
+                                          return CircularProgressIndicator();
+                                        }
+                                      },
                                     ),
                                   if (searchResults[index]['text'] != null)
                                     Text(
