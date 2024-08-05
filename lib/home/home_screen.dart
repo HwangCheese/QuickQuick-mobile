@@ -133,6 +133,74 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _showFriendSelectionDialog() async {
+    final response =
+        await http.get(Uri.parse('${SERVER_IP}/friends/${USER_ID}'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      List<Map<String, String>> friends = data
+          .map<Map<String, String>>((friend) => {
+                'user_id': friend['user_id'],
+                'user_name': friend['user_name'],
+              })
+          .toList();
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('친구 선택'),
+            content: Container(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: friends.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(friends[index]['user_name']!),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // You can add functionality here if needed
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('취소'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+    }
+  }
+
+  void _showMessage(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _togglePin(int index) {
     setState(() {
       memos[index]['isPinned'] = !memos[index]['isPinned'];
@@ -245,8 +313,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _shareSelectedMemos() {}
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -269,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   IconButton(
                     icon: Icon(Icons.share),
-                    onPressed: _shareSelectedMemos,
+                    onPressed: _showFriendSelectionDialog,
                   ),
                   IconButton(
                     icon: Icon(Icons.delete),
@@ -279,175 +345,180 @@ class _HomeScreenState extends State<HomeScreen> {
               : null,
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(
-            top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: <Widget>[
-                PopupMenuButton<int>(
-                  icon: Icon(Icons.more_vert, size: 35.0),
-                  onSelected: (int result) {
-                    if (result == 0) {
-                      _toggleSelectionMode();
-                    } else if (result == 1) {
-                      _navigateToCalendar(context);
-                    } else if (result == 2) {
-                      _navigateToFriendsList(context);
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => <PopupMenuEntry<int>>[
-                    const PopupMenuItem<int>(
-                      value: 0,
-                      child: Text('선택'),
-                    ),
-                    const PopupMenuItem<int>(
-                      value: 1,
-                      child: Text('캘린더'),
-                    ),
-                    const PopupMenuItem<int>(
-                      value: 2,
-                      child: Text('친구 목록'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SizedBox(height: 16.0),
-            TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: 'Search...',
-                prefixIcon: Icon(Icons.search),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                    width: 3.0, // 테두리 굵기
+      body: RefreshIndicator(
+        onRefresh: _fetchMemos, // 새로고침 시 호출될 함수
+        child: Padding(
+          padding: const EdgeInsets.only(
+              top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  PopupMenuButton<int>(
+                    icon: Icon(Icons.more_vert, size: 35.0),
+                    onSelected: (int result) {
+                      if (result == 0) {
+                        _toggleSelectionMode();
+                      } else if (result == 1) {
+                        _navigateToCalendar(context);
+                      } else if (result == 2) {
+                        _navigateToFriendsList(context);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) =>
+                        <PopupMenuEntry<int>>[
+                      const PopupMenuItem<int>(
+                        value: 0,
+                        child: Text('선택'),
+                      ),
+                      const PopupMenuItem<int>(
+                        value: 1,
+                        child: Text('캘린더'),
+                      ),
+                      const PopupMenuItem<int>(
+                        value: 2,
+                        child: Text('친구 목록'),
+                      ),
+                    ],
                   ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
-                    width: 3.0, // 테두리 굵기
-                  ),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFFE2F1FF), // 에러 상태 테두리 색상
-                    width: 3.0, // 테두리 굵기
-                  ),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFFE2F1FF), // 포커스 에러 상태 테두리 색상
-                    width: 3.0, // 테두리 굵기
-                  ),
-                ),
+                ],
               ),
-              onChanged: (text) {
-                _searchMemo(text); // 검색어가 변경될 때마다 호출
-              },
-            ),
-            SizedBox(height: 16.0),
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  childAspectRatio: 1,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                ),
-                itemCount: searchResults.length,
-                itemBuilder: (context, index) {
-                  bool isSelected = selectedMemos.contains(index);
-                  return GestureDetector(
-                    onTap: isSelectionMode
-                        ? () => _toggleMemoSelection(index)
-                        : () => _editMemo(context, index),
-                    onLongPress: () => _showMenu(context, index),
-                    child: Stack(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8.0),
-                            border: Border.all(color: Colors.grey),
-                            color:
-                                searchResults[index]['color'] ?? Colors.white,
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (searchResults[index]['imageUrl'] != null &&
-                                    searchResults[index]['imageUrl'] != '')
-                                  Image.network(
-                                    searchResults[index]['imageUrl'],
-                                    fit: BoxFit.cover,
-                                    height: 50,
-                                  ),
-                                if (searchResults[index]['text'] != null)
-                                  Text(
-                                    searchResults[index]['text'],
-                                    style: TextStyle(
-                                      fontSize: 16.0,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (searchResults[index]['isPinned'])
-                          Positioned(
-                            top: 8.0,
-                            right: 8.0,
-                            child: Icon(
-                              Icons.push_pin,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        if (isSelectionMode)
-                          Positioned(
-                            top: 8.0,
-                            left: 8.0,
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.blue[400]
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.transparent
-                                      : Colors.grey,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.check,
-                                size: 16,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.transparent,
-                              ),
-                            ),
-                          ),
-                      ],
+              SizedBox(height: 16.0),
+              TextField(
+                controller: _controller,
+                decoration: InputDecoration(
+                  hintText: 'Search...',
+                  prefixIcon: Icon(Icons.search),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
+                      width: 3.0, // 테두리 굵기
                     ),
-                  );
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
+                      width: 3.0, // 테두리 굵기
+                    ),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: Color(0xFFE2F1FF), // 에러 상태 테두리 색상
+                      width: 3.0, // 테두리 굵기
+                    ),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: Color(0xFFE2F1FF), // 포커스 에러 상태 테두리 색상
+                      width: 3.0, // 테두리 굵기
+                    ),
+                  ),
+                ),
+                onChanged: (text) {
+                  _searchMemo(text); // 검색어가 변경될 때마다 호출
                 },
               ),
-            )
-          ],
+              SizedBox(height: 16.0),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: searchResults.length,
+                  itemBuilder: (context, index) {
+                    bool isSelected = selectedMemos.contains(index);
+                    return GestureDetector(
+                      onTap: isSelectionMode
+                          ? () => _toggleMemoSelection(index)
+                          : () => _editMemo(context, index),
+                      onLongPress: () => _showMenu(context, index),
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(color: Colors.grey),
+                              color:
+                                  searchResults[index]['color'] ?? Colors.white,
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (searchResults[index]['imageUrl'] !=
+                                          null &&
+                                      searchResults[index]['imageUrl'] != '')
+                                    Image.network(
+                                      searchResults[index]['imageUrl'],
+                                      fit: BoxFit.cover,
+                                      height: 50,
+                                    ),
+                                  if (searchResults[index]['text'] != null)
+                                    Text(
+                                      searchResults[index]['text'],
+                                      style: TextStyle(
+                                        fontSize: 16.0,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (searchResults[index]['isPinned'])
+                            Positioned(
+                              top: 8.0,
+                              right: 8.0,
+                              child: Icon(
+                                Icons.push_pin,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          if (isSelectionMode)
+                            Positioned(
+                              top: 8.0,
+                              left: 8.0,
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.blue[400]
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.transparent
+                                        : Colors.grey,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              )
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
