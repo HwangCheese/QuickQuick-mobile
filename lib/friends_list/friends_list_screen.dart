@@ -46,8 +46,10 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             .toList();
         filteredFriends = friends;
       });
+      print('친구 목록 불러오기 성공: $friends');
     } else {
-      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+      _showMessage('친구 목록을 불러오는 데 실패했습니다. 응답 코드: ${response.statusCode}');
+      print('친구 목록 불러오기 실패: ${response.body}');
     }
   }
 
@@ -68,6 +70,24 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       _showMessage('친구 추가 성공!');
     } else {
       _showMessage('친구 추가 실패: ${json.decode(response.body)['error']}');
+      print('친구 추가 실패: ${response.body}');
+    }
+  }
+
+  Future<void> _deleteFriend(String friendUserId) async {
+    final response = await http.delete(
+      Uri.parse('${SERVER_IP}/friend/$USER_ID/$friendUserId'),
+      headers: <String, String>{
+        'Content-Type': 'application/json;',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      _fetchFriends(); // 친구 목록 갱신
+      _showMessage('친구 삭제 성공!');
+    } else {
+      _showMessage('친구 삭제 실패: ${json.decode(response.body)['error']}');
+      print('친구 삭제 실패: ${response.body}'); // 응답 내용을 출력
     }
   }
 
@@ -83,6 +103,33 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                 Navigator.of(context).pop();
               },
               child: Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteFriendDialog(String friendUserId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('친구 삭제'),
+          content: Text('친구를 삭제하시겠습니까?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                _deleteFriend(friendUserId);
+                Navigator.of(context).pop();
+              },
+              child: Text('삭제'),
             ),
           ],
         );
@@ -137,8 +184,15 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             child: ListView.builder(
               itemCount: filteredFriends.length,
               itemBuilder: (context, index) {
+                print(
+                    '친구 아이디: ${filteredFriends[index]['user_id']}, 친구 이름: ${filteredFriends[index]['user_name']}');
                 return ListTile(
                   title: Text(filteredFriends[index]['user_name']!),
+                  onLongPress: () {
+                    print("*************");
+                    print(filteredFriends[index]['user_id']);
+                    _showDeleteFriendDialog(filteredFriends[index]['user_id']!);
+                  },
                 );
               },
             ),
@@ -167,7 +221,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
           title: Text('친구 추가'),
           content: TextField(
             controller: _newFriendController,
-            decoration: InputDecoration(hintText: '친구 이름'),
+            decoration: InputDecoration(hintText: '아이디로 검색하세요'),
           ),
           actions: <Widget>[
             TextButton(
