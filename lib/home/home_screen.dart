@@ -245,9 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _shareSelectedMemos() {
-    print("Sharing selected memos");
-  }
+  void _shareSelectedMemos() {}
 
   @override
   Widget build(BuildContext context) {
@@ -255,8 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(kToolbarHeight),
         child: AppBar(
-          title:
-              isSelectionMode ? Text('${selectedMemos.length} selected') : null,
+          title: isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
           backgroundColor: Colors.transparent,
           leading: isSelectionMode
               ? IconButton(
