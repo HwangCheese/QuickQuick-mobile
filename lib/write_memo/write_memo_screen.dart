@@ -102,6 +102,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     };
 
     if (_isImageSelected) {
+      body['image_path'] = _imagePath!;
       await _uploadImage(_imagePath!, body);
     } else if (_filePath != null) {
       final file = File(_filePath!);
@@ -134,12 +135,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     request.fields
         .addAll(body.map((key, value) => MapEntry(key, value.toString())));
-
     request.files.add(await http.MultipartFile.fromPath('file', imagePath));
 
     final response = await request.send();
 
     if (response.statusCode == 201) {
+      final responseBody = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseBody);
+      final uploadedImagePath = responseData['path'];
+      body['image_path'] = uploadedImagePath; // 이미지 경로를 body에 추가
       print('이미지 업로드 성공');
     } else {
       print('이미지 업로드 실패: ${response.statusCode}');
@@ -306,6 +310,74 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  Future<void> _showFriendSelectionDialog() async {
+    final response =
+        await http.get(Uri.parse('${SERVER_IP}/friends/${USER_ID}'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      List<Map<String, String>> friends = data
+          .map<Map<String, String>>((friend) => {
+                'user_id': friend['user_id'],
+                'user_name': friend['user_name'],
+              })
+          .toList();
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('친구 선택'),
+            content: Container(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: friends.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(friends[index]['user_name']!),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // You can add functionality here if needed
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('취소'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+    }
+  }
+
+  void _showMessage(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -417,7 +489,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     IconButton(
                       iconSize: 45.0,
                       icon: const Icon(Icons.send_rounded),
-                      onPressed: () {},
+                      onPressed: _showFriendSelectionDialog,
                     ),
                   ],
                 ),

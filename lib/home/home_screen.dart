@@ -44,11 +44,11 @@ class _HomeScreenState extends State<HomeScreen> {
           memos = data.map((item) {
             return {
               'text': item['data_txt'],
-              'color': colorMap[item['theme']] ??
-                  Colors.white, // 서버에서 불러온 색상 이름을 색상 값으로 변환
+              'color': colorMap[item['theme']] ?? Colors.white,
               'isPinned': false,
               'dataId': item['dataId'],
-              'originalIndex': memos.length, // 원래 인덱스 설정
+              'originalIndex': memos.length,
+              'imageUrl': item['image_path'],
             };
           }).toList();
           searchResults = memos;
@@ -362,8 +362,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: GridView.builder(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, // 한 줄에 3개의 메모를 표시
-                  childAspectRatio: 1, // 정사각형으로 만들기 위해 1:1 비율 설정
+                  crossAxisCount: 3,
+                  childAspectRatio: 1,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
@@ -382,15 +382,28 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8.0),
                             border: Border.all(color: Colors.grey),
-                            color: searchResults[index]['color'] ??
-                                Colors.white, // 배경 색상 적용
+                            color:
+                                searchResults[index]['color'] ?? Colors.white,
                           ),
                           child: Center(
-                            child: Text(
-                              searchResults[index]['text'],
-                              style: TextStyle(
-                                fontSize: 16.0,
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (searchResults[index]['imageUrl'] != null &&
+                                    searchResults[index]['imageUrl'] != '')
+                                  Image.network(
+                                    searchResults[index]['imageUrl'],
+                                    fit: BoxFit.cover,
+                                    height: 50,
+                                  ),
+                                if (searchResults[index]['text'] != null)
+                                  Text(
+                                    searchResults[index]['text'],
+                                    style: TextStyle(
+                                      fontSize: 16.0,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -436,7 +449,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-            ),
+            )
           ],
         ),
       ),
