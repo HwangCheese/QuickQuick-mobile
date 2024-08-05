@@ -33,6 +33,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String? _audioPath;
   String? _imagePath;
   String? _filePath;
+  bool _isImageSelected = false;
 
   Map<String, Color> colorMap = {
     'pink': Colors.pink[100]!,
@@ -86,31 +87,62 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _saveMemoToServer() async {
-    final url = Uri.parse('$SERVER_IP/data');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({
-        'userId': USER_ID,
-        'format': 'txt',
-        'date': DateTime.now().toIso8601String(),
-        'isOpen': true,
-        'theme': getColorName(_backgroundColor), // 메모 배경색 이름
-        'posX': 500,
-        'posY': 500,
-        'width': 100,
-        'height': 100,
-        'data_txt': _controller.text,
-        'audio_path': _audioPath,
-      }),
-    );
+    var url = Uri.parse('$SERVER_IP/data');
+    final Map<String, dynamic> body = {
+      'userId': USER_ID,
+      'date': DateTime.now().toIso8601String(),
+      'isOpen': true,
+      'theme': getColorName(_backgroundColor),
+      'posX': 500,
+      'posY': 500,
+      'width': 100,
+      'height': 100,
+      'data_txt': _controller.text,
+      'audio_path': _audioPath,
+    };
+
+    if (_isImageSelected) {
+      await _uploadImage(_imagePath!, body);
+    } else if (_filePath != null) {
+      final file = File(_filePath!);
+      final fileBytes = await file.readAsBytes();
+      final fileBase64 = base64Encode(fileBytes);
+      final fileExtension = _filePath!.split('.').last;
+      body['file_data'] = fileBase64;
+      body['file_extension'] = fileExtension;
+      body['file_path'] = _filePath;
+    } else {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 201) {
+        print('메모 저장 성공');
+      } else {
+        print('메모 저장 실패: ${response.statusCode}');
+      }
+    }
+  }
+
+  Future<void> _uploadImage(String imagePath, Map<String, dynamic> body) async {
+    final url = Uri.parse('$SERVER_IP/upload');
+    final request = http.MultipartRequest('POST', url);
+
+    request.fields
+        .addAll(body.map((key, value) => MapEntry(key, value.toString())));
+
+    request.files.add(await http.MultipartFile.fromPath('file', imagePath));
+
+    final response = await request.send();
 
     if (response.statusCode == 201) {
-      print('메모 저장 성공');
+      print('이미지 업로드 성공');
     } else {
-      print('메모 저장 실패: ${response.statusCode}');
+      print('이미지 업로드 실패: ${response.statusCode}');
     }
   }
 
@@ -185,6 +217,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       await _picker.pickImage(source: ImageSource.camera);
                   if (pickedFile != null) {
                     setState(() {
+                      _isImageSelected = true;
                       _imagePath = pickedFile.path;
                       _filePath = null;
                     });
@@ -196,16 +229,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 title: Text('갤러리에서 선택'),
                 onTap: () async {
                   Navigator.pop(context);
-                  var status = await Permission.photos.request();
-                  if (status.isGranted) {
-                    final pickedFile =
-                        await _picker.pickImage(source: ImageSource.gallery);
-                    if (pickedFile != null) {
-                      setState(() {
-                        _imagePath = pickedFile.path;
-                        _filePath = null;
-                      });
-                    }
+                  final pickedFile =
+                      await _picker.pickImage(source: ImageSource.gallery);
+                  if (pickedFile != null) {
+                    setState(() {
+                      _isImageSelected = true;
+                      _imagePath = pickedFile.path;
+                      _filePath = null;
+                    });
                   }
                 },
               ),

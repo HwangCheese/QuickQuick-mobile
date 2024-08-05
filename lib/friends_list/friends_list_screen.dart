@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:sticker_memo/globals.dart';
 
 class FriendsListScreen extends StatefulWidget {
@@ -7,54 +9,82 @@ class FriendsListScreen extends StatefulWidget {
 }
 
 class _FriendsListScreenState extends State<FriendsListScreen> {
-  List<String> friends = ['이동건', '하여린', '윤단비', '전아린'];
-  List<String> filteredFriends = [];
+  List<Map<String, String>> friends = [];
+  List<Map<String, String>> filteredFriends = [];
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    filteredFriends = friends;
     _searchController.addListener(_filterFriends);
+    _fetchFriends();
   }
 
   void _filterFriends() {
     setState(() {
       filteredFriends = friends
-          .where((friend) => friend
-              .toLowerCase()
-              .contains(_searchController.text.toLowerCase()))
+          .where((friend) =>
+              friend['user_name'] != null &&
+              friend['user_name']!
+                  .toLowerCase()
+                  .contains(_searchController.text.toLowerCase()))
           .toList();
     });
   }
 
-  void _addFriend(String newFriend) {
-    setState(() {
-      friends.add(newFriend);
-      filteredFriends = friends;
-    });
+  Future<void> _fetchFriends() async {
+    final response =
+        await http.get(Uri.parse('${SERVER_IP}/friends/${USER_ID}'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      setState(() {
+        friends = data
+            .map<Map<String, String>>((friend) => {
+                  'user_id': friend['user_id'],
+                  'user_name': friend['user_name'],
+                })
+            .toList();
+        filteredFriends = friends;
+      });
+    } else {
+      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+    }
   }
 
-  void _showMenu(BuildContext context, int index) {
-    showModalBottomSheet(
+  Future<void> _addFriend(String friendUserId) async {
+    final response = await http.post(
+      Uri.parse('${SERVER_IP}/friend'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'user_id': USER_ID,
+        'friend_user_id': friendUserId,
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      _fetchFriends(); // 친구 목록 갱신
+      _showMessage('친구 추가 성공!');
+    } else {
+      _showMessage('친구 추가 실패: ${json.decode(response.body)['error']}');
+    }
+  }
+
+  void _showMessage(String message) {
+    showDialog(
       context: context,
       builder: (BuildContext context) {
-        return Container(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: Icon(Icons.delete),
-                title: Text('삭제'),
-                onTap: () {
-                  setState(() {
-                    friends.removeAt(index);
-                    _filterFriends();
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
+        return AlertDialog(
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('확인'),
+            ),
+          ],
         );
       },
     );
@@ -107,11 +137,8 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             child: ListView.builder(
               itemCount: filteredFriends.length,
               itemBuilder: (context, index) {
-                return GestureDetector(
-                  onLongPress: () => _showMenu(context, index),
-                  child: ListTile(
-                    title: Text(filteredFriends[index]),
-                  ),
+                return ListTile(
+                  title: Text(filteredFriends[index]['user_name']!),
                 );
               },
             ),
