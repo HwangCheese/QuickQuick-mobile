@@ -377,6 +377,43 @@ app.delete('/friend', (req, res) => {
     });
 });
 
+// 메모 보내기 API
+app.post('/sendMemo', (req, res) => {
+    const { senderId, receiverId, memoId } = req.body;
+
+    // senderId와 memoId를 사용하여 메모를 조회
+    db.get('SELECT * FROM Data WHERE dataId = ? AND userId = ?', [memoId, senderId], (err, row) => {
+        if (err) {
+            return res.status(500).json({ error: '데이터베이스 조회 오류', message: err.message });
+        }
+        if (!row) {
+            return res.status(404).json({ error: '메모를 찾을 수 없습니다.' });
+        }
+
+        // receiverId를 사용하여 메모를 복사
+        const newMemoId = uuid.v4();
+        const newPath = path.join('Users', receiverId, 'Data', 'txt', `${newMemoId}.txt`);
+
+        fs.copyFile(row.path, newPath, (err) => {
+            if (err) {
+                return res.status(500).json({ error: '파일 복사 오류', message: err.message });
+            }
+
+            db.run(
+                `INSERT INTO Data (dataId, userId, path, format, date, isOpen, theme, posX, posY, width, height, data_txt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [newMemoId, receiverId, newPath, row.format, row.date, row.isOpen, row.theme, row.posX, row.posY, row.width, row.height, row.data_txt],
+                function(err) {
+                    if (err) {
+                        return res.status(500).json({ error: '데이터베이스 삽입 오류', message: err.message });
+                    }
+                    res.status(201).json({ message: '메모가 성공적으로 전송되었습니다.' });
+                }
+            );
+        });
+    });
+});
+
 
 app.listen(port, ()=>{
     console.log(`서버 오픈 포트번호:${port}`);
