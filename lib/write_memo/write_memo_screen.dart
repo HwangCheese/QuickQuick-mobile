@@ -143,7 +143,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
     final responseData = jsonDecode(responseBody);
-    final uploadedImagePath = responseData['path'];
 
     if (response.statusCode == 201) {
       print('이미지 업로드 성공');

@@ -45,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
           memos = data.map((item) {
             return {
               'format': item['format'],
-              'imagePath': item['path'],
               'text': item['data_txt'],
               'color': colorMap[item['theme']] ?? Colors.white,
               'isPinned': false,
@@ -481,14 +480,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         if (snapshot.connectionState ==
                                             ConnectionState.done) {
                                           if (snapshot.hasData) {
-                                            return AspectRatio(
-                                              aspectRatio: 1, // 가로 세로 비율 조절
-                                              child: Image.memory(
-                                                snapshot.data!,
-                                                fit: BoxFit
-                                                    .cover, // 이미지가 컨테이너에 맞게 조절
-                                              ),
-                                            );
+                                            return Image.memory(snapshot.data!);
                                           } else {
                                             return Text('이미지를 불러올 수 없습니다.');
                                           }
@@ -574,6 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _searchMemo(_controller.text); // 새로운 메모 추가 시 검색 결과 업데이트
             });
           }
+          _fetchMemos(); // 서버에서 최신 데이터 불러오기
         },
         child: Icon(Icons.add),
       ),
