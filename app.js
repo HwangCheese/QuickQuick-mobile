@@ -157,11 +157,12 @@ app.post('/signup', (req, res) => {
 
 // text 데이터 post
 app.post('/data', (req, res) => {
-    const { userId, format, isOpen, theme, posX, posY, width, height, data_txt } = req.body;
+    const { userId, recipientId, format, isOpen, theme, posX, posY, width, height, data_txt } = req.body;
     const date = new Date().toISOString();
     const dataId = uuid.v4();  // UUID 생성
-    const userDir = path.join(__dirname, 'Users', userId, 'Data', 'txt');
+    const userDir = path.join(__dirname, 'Users', recipientId, 'Data', 'txt');  // Note the use of recipientId here
     const filePath = path.join(userDir, `${dataId}.txt`); // 템플릿 리터럴 수정
+
     // 디렉토리가 존재하지 않으면 생성
     fs.mkdir(userDir, { recursive: true }, (err) => {
         if (err) {
@@ -188,6 +189,7 @@ app.post('/data', (req, res) => {
         });
     });
 });
+
 
 // 파일 업로드 API
 app.post('/upload', upload.single('file'), (req, res) => {
