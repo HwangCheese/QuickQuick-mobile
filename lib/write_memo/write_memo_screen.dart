@@ -1,3 +1,5 @@
+import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
+
 import 'package:convert/convert.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -15,8 +17,14 @@ class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
   final Color? initialColor;
   final String? initialDataId;
+  final Uint8List? initialImageData; // 이미지 데이터를 받기 위한 매개변수 추가
 
-  WriteMemoScreen({this.initialText, this.initialColor, this.initialDataId});
+  WriteMemoScreen({
+    this.initialText,
+    this.initialColor,
+    this.initialDataId,
+    this.initialImageData,
+  });
 
   @override
   _WriteMemoScreenState createState() => _WriteMemoScreenState();
@@ -34,6 +42,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String? _imagePath;
   String? _filePath;
   bool _isImageSelected = false;
+  Uint8List? _imageData; // 이미지 데이터
 
   Map<String, Color> colorMap = {
     'pink': Colors.pink[100]!,
@@ -61,6 +70,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
     if (widget.initialDataId != null) {
       _deleteMemoFromServer(widget.initialDataId!);
+    }
+    if (widget.initialImageData != null) {
+      _isImageSelected = true;
+      _imageData = widget.initialImageData; // 초기 이미지 데이터 설정
     }
     _initRecorder();
   }
@@ -103,10 +116,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     };
 
     if (_isImageSelected) {
-      final fileExtension = _imagePath!.split('.').last;
-      body['format'] = fileExtension;
-      print(fileExtension);
-      await _uploadImage(_imagePath!, body);
+      if (_imagePath != null) {
+        final fileExtension = _imagePath!.split('.').last;
+        body['format'] = fileExtension;
+        print(fileExtension);
+        await _uploadImage(_imagePath!, body);
+      } else if (_imageData != null) {
+        // 기존 이미지를 사용하여 업로드 로직 추가
+        // 로컬 파일로 저장 후 업로드하는 방법
+        final tempDir = await getTemporaryDirectory();
+        final file = await File('${tempDir.path}/temp_image.png').create();
+        await file.writeAsBytes(_imageData!);
+        await _uploadImage(file.path, body);
+      }
     } else if (_filePath != null) {
       final file = File(_filePath!);
       final fileBytes = await file.readAsBytes();
@@ -225,6 +247,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       _isImageSelected = true;
                       _imagePath = pickedFile.path;
                       _filePath = null;
+                      _imageData = null;
                     });
                   }
                 },
@@ -241,6 +264,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       _isImageSelected = true;
                       _imagePath = pickedFile.path;
                       _filePath = null;
+                      _imageData = null;
                     });
                   }
                 },
@@ -265,6 +289,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     setState(() {
                       _filePath = result.files.single.path;
                       _imagePath = null;
+                      _imageData = null;
                     });
                   }
                 },
@@ -395,6 +420,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               'text': _controller.text,
               'color': _backgroundColor,
               'isPinned': false,
+              'dataId': widget.initialDataId,
             });
           },
         ),
@@ -440,6 +466,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         Positioned.fill(
                           child: Image.file(
                             File(_imagePath!),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      if (_imageData != null)
+                        Positioned.fill(
+                          child: Image.memory(
+                            _imageData!,
                             fit: BoxFit.cover,
                           ),
                         ),
