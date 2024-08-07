@@ -480,7 +480,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                         if (snapshot.connectionState ==
                                             ConnectionState.done) {
                                           if (snapshot.hasData) {
-                                            return Image.memory(snapshot.data!);
+                                            return AspectRatio(
+                                              aspectRatio: 1, // 가로 세로 비율 조절
+                                              child: Image.memory(
+                                                snapshot.data!,
+                                                fit: BoxFit
+                                                    .cover, // 이미지가 컨테이너에 맞게 조절
+                                              ),
+                                            );
                                           } else {
                                             return Text('이미지를 불러올 수 없습니다.');
                                           }
