@@ -18,11 +18,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     // Temporary event data
     _events = {
-      DateTime.utc(2024, 7, 27): [
-        '오후 3시 교수님 미팅 신난당',
-        '오후 5시 팀 회의',
-        '오후 10시 회식'
-      ],
+      DateTime.utc(2024, 7, 27): ['오후 3시 교수님 미팅', '오후 5시 팀 회의', '오후 10시 회식'],
       DateTime.utc(2024, 7, 28): ['오후 7시 동아리 회식', '오전 2시 개인 공부'],
     };
   }
@@ -63,66 +59,67 @@ class _CalendarScreenState extends State<CalendarScreen> {
             top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
         child: Column(
           children: <Widget>[
-            Localizations.override(
-              context: context,
-              locale: const Locale('ko'),
-              child: TableCalendar(
-                headerStyle: HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  leftChevronVisible: true,
-                  rightChevronVisible: true,
-                ),
-                firstDay: DateTime.utc(2010, 10, 16),
-                lastDay: DateTime.utc(2030, 3, 14),
-                focusedDay: _focusedDay,
-                selectedDayPredicate: (day) {
-                  return isSameDay(_selectedDay, day);
-                },
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay =
-                        focusedDay; // update `_focusedDay` here as well
-                  });
-                },
-                onPageChanged: (focusedDay) {
-                  _focusedDay = focusedDay;
-                },
-                eventLoader: _getEventsForDay,
-                calendarBuilders: CalendarBuilders(
-                  markerBuilder: (context, date, events) {
-                    if (events.isNotEmpty) {
-                      return Positioned(
-                        bottom: 1,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.blue, // Marker color
-                          ),
+            TableCalendar(
+              locale: 'ko_KR',
+              headerStyle: HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+                leftChevronVisible: true,
+                rightChevronVisible: true,
+                titleTextStyle: TextStyle(fontSize: 23.0), // 연, 월 글씨 크기 설정
+                headerMargin:
+                    const EdgeInsets.only(bottom: 30.0), // 헤더와 날짜 사이 간격
+              ),
+              firstDay: DateTime.utc(2010, 10, 16),
+              lastDay: DateTime.utc(2030, 3, 14),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) {
+                return isSameDay(_selectedDay, day);
+              },
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay; // update `_focusedDay` here as well
+                });
+              },
+              onPageChanged: (focusedDay) {
+                _focusedDay = focusedDay;
+              },
+              eventLoader: _getEventsForDay,
+              calendarBuilders: CalendarBuilders(
+                markerBuilder: (context, date, events) {
+                  if (events.isNotEmpty) {
+                    return Positioned(
+                      bottom: 1,
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.blue, // Marker color
                         ),
-                      );
-                    }
-                    return null;
-                  },
+                      ),
+                    );
+                  }
+                  return null;
+                },
+              ),
+              calendarStyle: CalendarStyle(
+                todayDecoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Color(0xFFBBDEFB), width: 1.5),
                 ),
-                calendarStyle: CalendarStyle(
-                  todayDecoration: BoxDecoration(
-                    color: Colors.transparent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Color(0xFFBBDEFB), width: 1.5),
-                  ),
-                  todayTextStyle: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                  selectedDecoration: BoxDecoration(
-                    color: Colors.blue[300],
-                    shape: BoxShape.circle,
-                  ),
+                todayTextStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
+                selectedDecoration: BoxDecoration(
+                  color: Colors.blue[300],
+                  shape: BoxShape.circle,
+                ),
+                cellMargin:
+                    const EdgeInsets.symmetric(vertical: 4.0), // 날짜 셀 간격
               ),
             ),
             const SizedBox(height: 20),
