@@ -46,11 +46,13 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             .toList();
         filteredFriends = friends;
       });
-      print('친구 목록 불러오기 성공: $friends');
     } else {
-      _showMessage('친구 목록을 불러오는 데 실패했습니다. 응답 코드: ${response.statusCode}');
-      print('친구 목록 불러오기 실패: ${response.body}');
+      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
     }
+  }
+
+  Future<void> _refreshFriends() async {
+    await _fetchFriends();
   }
 
   Future<void> _addFriend(String friendUserId) async {
@@ -66,28 +68,29 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     );
 
     if (response.statusCode == 201) {
-      _fetchFriends(); // 친구 목록 갱신
-      _showMessage('친구 추가 성공!');
+      // 친구 추가 성공 후, 친구 목록을 새로고침하여 UI를 즉시 업데이트
+      await _fetchFriends();
     } else {
       _showMessage('친구 추가 실패: ${json.decode(response.body)['error']}');
-      print('친구 추가 실패: ${response.body}');
     }
   }
 
   Future<void> _deleteFriend(String friendUserId) async {
+    final url = Uri.parse('${SERVER_IP}/friend');
     final response = await http.delete(
-      Uri.parse('${SERVER_IP}/friend/$USER_ID/$friendUserId'),
-      headers: <String, String>{
-        'Content-Type': 'application/json;',
-      },
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'user_id': USER_ID,
+        'friend_user_id': friendUserId,
+      }),
     );
 
     if (response.statusCode == 200) {
-      _fetchFriends(); // 친구 목록 갱신
-      _showMessage('친구 삭제 성공!');
-    } else {
-      _showMessage('친구 삭제 실패: ${json.decode(response.body)['error']}');
-      print('친구 삭제 실패: ${response.body}'); // 응답 내용을 출력
+      setState(() {
+        friends.removeWhere((friend) => friend['user_id'] == friendUserId);
+        filteredFriends = friends;
+      });
     }
   }
 
@@ -116,7 +119,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('친구 삭제'),
-          content: Text('친구를 삭제하시겠습니까?'),
+          content: Text('친구를 삭제합니다'),
           actions: <Widget>[
             TextButton(
               onPressed: () {
@@ -143,61 +146,62 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       appBar: AppBar(
         title: Text('친구 목록'),
       ),
-      body: Column(
-        children: <Widget>[
-          SizedBox(height: 60.0), // 검색창을 아래로 내리기 위한 여백
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16.0), // 검색창과 리스트 사이의 간격
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: '이름 검색',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                      width: 3.0, // 테두리 굵기
+      body: RefreshIndicator(
+        onRefresh: _refreshFriends,
+        child: Column(
+          children: <Widget>[
+            SizedBox(height: 60.0), // 검색창을 아래로 내리기 위한 여백
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16.0), // 검색창과 리스트 사이의 간격
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '이름 검색',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide(
+                        color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
+                        width: 3.0, // 테두리 굵기
+                      ),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                      width: 3.0, // 테두리 굵기
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide(
+                        color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
+                        width: 3.0, // 테두리 굵기
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
-                      width: 3.0, // 테두리 굵기
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide(
+                        color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
+                        width: 3.0, // 테두리 굵기
+                      ),
                     ),
+                    suffixIcon:
+                        Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                   ),
-                  suffixIcon: Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: filteredFriends.length,
-              itemBuilder: (context, index) {
-                print(
-                    '친구 아이디: ${filteredFriends[index]['user_id']}, 친구 이름: ${filteredFriends[index]['user_name']}');
-                return ListTile(
-                  title: Text(filteredFriends[index]['user_name']!),
-                  onLongPress: () {
-                    print("*************");
-                    print(filteredFriends[index]['user_id']);
-                    _showDeleteFriendDialog(filteredFriends[index]['user_id']!);
-                  },
-                );
-              },
+            Expanded(
+              child: ListView.builder(
+                itemCount: filteredFriends.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(filteredFriends[index]['user_name']!),
+                    onLongPress: () {
+                      _showDeleteFriendDialog(
+                          filteredFriends[index]['user_id']!);
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
