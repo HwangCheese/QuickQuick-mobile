@@ -36,8 +36,8 @@ class _LogInState extends State<LogIn> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'user_id': userid,
-          'user_pw': password,
+          'id': userid,
+          'paassword': password,
         }),
       );
 
