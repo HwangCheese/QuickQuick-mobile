@@ -1,17 +1,15 @@
 import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
-
-import 'package:convert/convert.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:sticker_memo/globals.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'dart:io';
+
+import '../../globals.dart';
 
 class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
@@ -39,10 +37,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   bool _isRecording = false;
   String? _audioPath;
-  String? _imagePath;
+  List<String> _imagePaths = [];
   String? _filePath;
   bool _isImageSelected = false;
   Uint8List? _imageData; // 이미지 데이터
+  int? _selectedImageIndex; // 선택된 이미지 인덱스
 
   Map<String, Color> colorMap = {
     'pink': Colors.pink[100]!,
@@ -116,14 +115,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     };
 
     if (_isImageSelected) {
-      if (_imagePath != null) {
-        final fileExtension = _imagePath!.split('.').last;
-        body['format'] = fileExtension;
-        print(fileExtension);
-        await _uploadImage(_imagePath!, body);
+      if (_imagePaths.isNotEmpty) {
+        final tempDir = await getTemporaryDirectory();
+        for (var imagePath in _imagePaths) {
+          final fileExtension = imagePath.split('.').last;
+          body['format'] = fileExtension;
+          await _uploadImage(imagePath, body);
+        }
       } else if (_imageData != null) {
-        // 기존 이미지를 사용하여 업로드 로직 추가
-        // 로컬 파일로 저장 후 업로드하는 방법
         final tempDir = await getTemporaryDirectory();
         final file = await File('${tempDir.path}/temp_image.png').create();
         await file.writeAsBytes(_imageData!);
@@ -245,7 +244,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   if (pickedFile != null) {
                     setState(() {
                       _isImageSelected = true;
-                      _imagePath = pickedFile.path;
+                      _imagePaths.add(pickedFile.path);
                       _filePath = null;
                       _imageData = null;
                     });
@@ -262,7 +261,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   if (pickedFile != null) {
                     setState(() {
                       _isImageSelected = true;
-                      _imagePath = pickedFile.path;
+                      _imagePaths.add(pickedFile.path);
                       _filePath = null;
                       _imageData = null;
                     });
@@ -288,7 +287,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   if (result != null) {
                     setState(() {
                       _filePath = result.files.single.path;
-                      _imagePath = null;
+                      _imagePaths.clear();
                       _imageData = null;
                     });
                   }
@@ -299,22 +298,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         );
       },
     );
-  }
-
-  Future<List<int>> readImageAsBlob(String imagePath) async {
-    final file = File(imagePath);
-    return await file.readAsBytes();
-  }
-
-  Future<void> writeBlobToImage(List<int> blobData, String outputPath) async {
-    final file = File(outputPath);
-    await file.writeAsBytes(blobData);
-  }
-
-  Future<void> saveBlobAsHex(List<int> blobData, String hexOutputPath) async {
-    final file = File(hexOutputPath);
-    final hexData = hex.encode(blobData);
-    await file.writeAsString(hexData);
   }
 
   Future<void> _startRecording() async {
@@ -334,6 +317,40 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     setState(() {
       _isRecording = false;
     });
+  }
+
+  Future<void> _saveAndShareMemo() async {
+    try {
+      // 메모를 서버에 저장합니다.
+      await _saveMemoToServer();
+
+      // 메모 저장이 성공하면 친구 목록을 표시합니다.
+      _showFriendSelectionDialog();
+    } catch (e) {
+      // 저장 중 오류가 발생하면 메시지를 보여줍니다.
+      _showMessage('메모 저장 중 오류가 발생했습니다.');
+    }
+  }
+
+  Future<void> _shareMemoWithFriend(String friendUserId) async {
+    final url = Uri.parse('$SERVER_IP/shareMemo');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'from_user_id': USER_ID,
+        'to_user_id': friendUserId,
+        'memo_id': widget.initialDataId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('메모 공유 성공');
+      _showMessage('메모가 성공적으로 공유되었습니다.');
+    } else {
+      print('메모 공유 실패: ${response.statusCode}');
+      _showMessage('메모 공유에 실패했습니다.');
+    }
   }
 
   Future<void> _showFriendSelectionDialog() async {
@@ -363,6 +380,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     title: Text(friends[index]['user_name']!),
                     onTap: () {
                       Navigator.pop(context);
+                      _shareMemoWithFriend(friends[index]['user_id']!);
                     },
                   );
                 },
@@ -403,6 +421,23 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
+  void _removeImage(int index) {
+    setState(() {
+      _imagePaths.removeAt(index);
+      _selectedImageIndex = null;
+    });
+  }
+
+  void _toggleImageSelection(int index) {
+    setState(() {
+      if (_selectedImageIndex == index) {
+        _selectedImageIndex = null; // 선택된 이미지가 다시 터치되면 선택 해제
+      } else {
+        _selectedImageIndex = index; // 해당 이미지를 선택
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -410,10 +445,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      backgroundColor: Color(0xFFE2F1FF),
+      backgroundColor: Color(0xFFE2F1FF), // 기존 파란색 배경 유지
       appBar: AppBar(
-        backgroundColor: Color(0xFFE2F1FF),
+        backgroundColor: Color(0xFFE2F1FF), // AppBar 배경도 파란색으로 유지
         leading: BackButton(
+          color: Colors.black, // 뒤로가기 버튼 색상 설정
           onPressed: () async {
             await _saveMemoToServer();
             Navigator.pop(context, {
@@ -424,7 +460,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             });
           },
         ),
-        title: Text('메모 작성'),
+        title:
+            Text('메모 작성', style: TextStyle(color: Colors.black)), // 제목 글자 색상 설정
       ),
       body: GestureDetector(
         onTap: () {
@@ -436,16 +473,82 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                SizedBox(
+                Container(
                   width: screenWidth * 0.9,
                   height: screenHeight * 0.6,
-                  child: Stack(
+                  decoration: BoxDecoration(
+                    color: Colors.white, // 이미지와 메모 영역 배경을 흰색으로 설정
+                    borderRadius: BorderRadius.circular(16.0), // 모서리를 둥글게 설정
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8.0,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
                     children: [
-                      Positioned(
-                        top: 20, // 원하는 만큼 아래로 내리기
-                        left: 0,
-                        right: 0,
-                        bottom: 0, // 공간을 확보하여 TextField가 Stack 내에서 위치를 유지
+                      if (_imagePaths.isNotEmpty)
+                        Expanded(
+                          flex: 3,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _imagePaths.length,
+                            itemBuilder: (context, index) {
+                              return GestureDetector(
+                                onTap: () => _toggleImageSelection(index),
+                                child: Stack(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8.0),
+                                      child: AspectRatio(
+                                        aspectRatio: 1.0, // 정사각형 비율 유지
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                              16.0), // 이미지 모서리 둥글게 설정
+                                          child: Image.file(
+                                            File(_imagePaths[index]),
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (_selectedImageIndex == index)
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: GestureDetector(
+                                          onTap: () => _removeImage(index),
+                                          child: CircleAvatar(
+                                            backgroundColor: Colors.grey,
+                                            radius: 16,
+                                            child: Icon(
+                                              Icons.close,
+                                              size: 16,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      if (_filePath != null)
+                        Container(
+                          color: Colors.white,
+                          padding: EdgeInsets.all(8.0),
+                          child: Text(
+                            'File attached: ${_filePath!.split('/').last}',
+                            style: TextStyle(color: Colors.black),
+                          ),
+                        ),
+                      Expanded(
+                        flex: 2,
                         child: TextField(
                           controller: _controller,
                           focusNode: _focusNode,
@@ -454,41 +557,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           textAlignVertical: TextAlignVertical.top,
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: _backgroundColor,
+                            fillColor: Colors.white, // 메모 입력 필드 배경을 흰색으로 설정
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: BorderRadius.circular(
+                                  16.0), // 텍스트 필드 모서리를 둥글게 설정
                               borderSide: BorderSide.none,
                             ),
                           ),
                         ),
                       ),
-                      if (_imagePath != null)
-                        Positioned.fill(
-                          child: Image.file(
-                            File(_imagePath!),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      if (_imageData != null)
-                        Positioned.fill(
-                          child: Image.memory(
-                            _imageData!,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      if (_filePath != null)
-                        Positioned(
-                          bottom: 10,
-                          left: 10,
-                          child: Container(
-                            color: Colors.white,
-                            padding: EdgeInsets.all(8.0),
-                            child: Text(
-                              'File attached: ${_filePath!.split('/').last}',
-                              style: TextStyle(color: Colors.black),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -522,7 +599,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     IconButton(
                       iconSize: 45.0,
                       icon: const Icon(Icons.send_rounded),
-                      onPressed: _showFriendSelectionDialog,
+                      onPressed: _saveAndShareMemo,
                     ),
                   ],
                 ),
