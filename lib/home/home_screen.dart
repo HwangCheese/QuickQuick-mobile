@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
 import '../calendar/calendar_screen.dart';
 import '../friends_list/friends_list_screen.dart';
 import '../write_memo/write_memo_screen.dart';
+import '../login/login_screen.dart';
 import 'package:sticker_memo/globals.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -352,22 +354,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _toggleSelectionMode,
                 )
               : null,
-          actions: isSelectionMode
-              ? [
-                  IconButton(
-                    icon: Icon(Icons.select_all),
-                    onPressed: _selectAllMemos,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.share),
-                    onPressed: _showFriendSelectionDialog,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.delete),
-                    onPressed: _deleteSelectedMemos,
-                  ),
-                ]
-              : null,
+          actions: [
+            if (isSelectionMode) ...[
+              IconButton(
+                icon: Icon(Icons.select_all),
+                onPressed: _selectAllMemos,
+              ),
+              IconButton(
+                icon: Icon(Icons.share),
+                onPressed: _showFriendSelectionDialog,
+              ),
+              IconButton(
+                icon: Icon(Icons.delete),
+                onPressed: _deleteSelectedMemos,
+              ),
+            ],
+            IconButton(
+              icon: Icon(Icons.logout),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('isLoggedIn'); // 로그인 상태 제거
+
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => LogIn()),
+                );
+              },
+            ),
+          ],
         ),
       ),
       body: RefreshIndicator(
