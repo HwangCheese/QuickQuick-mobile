@@ -44,7 +44,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   bool _isMediaSelected = false;
   Uint8List? _imageData;
   int? _selectedMediaIndex;
-  VideoPlayerController? _videoController;
+  List<VideoPlayerController?> _videoControllers = [];
 
   Map<String, Color> colorMap = {
     'pink': Colors.pink[100]!,
@@ -78,6 +78,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       _imageData = widget.initialImageData;
     }
     _initRecorder();
+    _videoControllers = []; // Initialize as an empty growable list
   }
 
   Future<void> _deleteMemoFromServer(String dataId) async {
@@ -98,7 +99,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   void dispose() {
     _controller.dispose();
     _recorder.closeRecorder();
-    _videoController?.dispose(); // 비디오 컨트롤러 해제
+    for (var controller in _videoControllers) {
+      controller?.dispose();
+    }
     super.dispose();
   }
 
@@ -263,6 +266,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     _mediaPaths.add(pickedFile.path);
                                     _filePath = null;
                                     _imageData = null;
+                                    _videoControllers.add(null);
                                   });
                                 }
                               },
@@ -280,7 +284,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     _mediaPaths.add(pickedFile.path);
                                     _filePath = null;
                                     _imageData = null;
-                                    _initializeVideoController(pickedFile.path);
+                                    _videoControllers.add(null);
+                                    _initializeVideoController(pickedFile.path,
+                                        _mediaPaths.length - 1);
                                   });
                                 }
                               },
@@ -317,6 +323,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     _mediaPaths.add(pickedFile.path);
                                     _filePath = null;
                                     _imageData = null;
+                                    _videoControllers.add(null);
                                   });
                                 }
                               },
@@ -334,7 +341,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     _mediaPaths.add(pickedFile.path);
                                     _filePath = null;
                                     _imageData = null;
-                                    _initializeVideoController(pickedFile.path);
+                                    _videoControllers.add(null);
+                                    _initializeVideoController(pickedFile.path,
+                                        _mediaPaths.length - 1);
                                   });
                                 }
                               },
@@ -359,6 +368,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       _filePath = result.files.single.path;
                       _filePaths.add(_filePath!);
                       _mediaPaths.clear();
+                      _videoControllers.clear();
                       _imageData = null;
                     });
                   }
@@ -371,12 +381,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
-  void _initializeVideoController(String videoPath) {
-    _videoController = VideoPlayerController.file(File(videoPath))
-      ..initialize().then((_) {
-        setState(() {}); // 비디오 컨트롤러 초기화 후 UI 업데이트
-        _videoController!.play(); // 비디오 자동 재생
+  void _initializeVideoController(String videoPath, int index) {
+    final controller = VideoPlayerController.file(File(videoPath));
+    controller.initialize().then((_) {
+      setState(() {
+        if (_videoControllers.length <= index) {
+          _videoControllers.add(controller);
+        } else {
+          _videoControllers[index] = controller;
+        }
+        _videoControllers[index]?.play(); // Auto-play the video
       });
+    });
   }
 
   Future<void> _startRecording() async {
@@ -503,11 +519,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   void _removeMedia(int index) {
     setState(() {
       _mediaPaths.removeAt(index);
-      _selectedMediaIndex = null;
-      if (_mediaPaths.isEmpty) {
-        _videoController?.dispose();
-        _videoController = null;
+      if (_videoControllers[index] != null) {
+        _videoControllers[index]?.dispose();
+        _videoControllers.removeAt(index);
       }
+      _selectedMediaIndex = null;
     });
   }
 
@@ -515,8 +531,28 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     setState(() {
       if (_selectedMediaIndex == index) {
         _selectedMediaIndex = null; // 선택된 미디어가 다시 터치되면 선택 해제
+        if (_videoControllers[index] != null &&
+            _videoControllers[index]!.value.isInitialized) {
+          if (_videoControllers[index]!.value.isPlaying) {
+            _videoControllers[index]!.pause();
+          } else {
+            _videoControllers[index]!.seekTo(Duration.zero);
+            _videoControllers[index]!.play();
+          }
+        }
       } else {
         _selectedMediaIndex = index; // 해당 미디어를 선택
+        if (_mediaPaths[index].endsWith('.mp4') ||
+            _mediaPaths[index].endsWith('.MOV') ||
+            _mediaPaths[index].endsWith('.mov')) {
+          if (_videoControllers[index] == null) {
+            _initializeVideoController(_mediaPaths[index], index);
+          } else {
+            if (!_videoControllers[index]!.value.isPlaying) {
+              _videoControllers[index]!.play();
+            }
+          }
+        }
       }
     });
   }
@@ -597,11 +633,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                           borderRadius: BorderRadius.circular(
                                               16.0), // Rounded corners for media
                                           child: isVideo
-                                              ? _videoController != null &&
-                                                      _videoController!
-                                                          .value.isInitialized
+                                              ? _videoControllers[index] !=
+                                                          null &&
+                                                      _videoControllers[index]!
+                                                          .value
+                                                          .isInitialized
                                                   ? VideoPlayer(
-                                                      _videoController!)
+                                                      _videoControllers[index]!)
                                                   : Center(
                                                       child:
                                                           CircularProgressIndicator())

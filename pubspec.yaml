@@ -27,6 +27,7 @@ dependencies:
   shared_preferences: ^2.0.6
   convert: ^3.0.1
   flutter_secure_storage: ^9.2.2
+  video_player: ^2.2.15
 
 dev_dependencies:
   flutter_test:
