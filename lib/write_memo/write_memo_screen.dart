@@ -1,4 +1,4 @@
-import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
+import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'dart:io';
+import 'package:video_player/video_player.dart';
 
 import '../../globals.dart';
 
@@ -15,7 +16,7 @@ class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
   final Color? initialColor;
   final String? initialDataId;
-  final Uint8List? initialImageData; // 이미지 데이터를 받기 위한 매개변수 추가
+  final Uint8List? initialImageData;
 
   WriteMemoScreen({
     this.initialText,
@@ -37,11 +38,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   bool _isRecording = false;
   String? _audioPath;
-  List<String> _imagePaths = [];
+  List<String> _mediaPaths = [];
   String? _filePath;
-  bool _isImageSelected = false;
-  Uint8List? _imageData; // 이미지 데이터
-  int? _selectedImageIndex; // 선택된 이미지 인덱스
+  List<String> _filePaths = [];
+  bool _isMediaSelected = false;
+  Uint8List? _imageData;
+  int? _selectedMediaIndex;
+  VideoPlayerController? _videoController;
 
   Map<String, Color> colorMap = {
     'pink': Colors.pink[100]!,
@@ -71,8 +74,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       _deleteMemoFromServer(widget.initialDataId!);
     }
     if (widget.initialImageData != null) {
-      _isImageSelected = true;
-      _imageData = widget.initialImageData; // 초기 이미지 데이터 설정
+      _isMediaSelected = true;
+      _imageData = widget.initialImageData;
     }
     _initRecorder();
   }
@@ -95,6 +98,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   void dispose() {
     _controller.dispose();
     _recorder.closeRecorder();
+    _videoController?.dispose(); // 비디오 컨트롤러 해제
     super.dispose();
   }
 
@@ -114,21 +118,21 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       'audio_path': _audioPath,
     };
 
-    if (_isImageSelected) {
-      if (_imagePaths.isNotEmpty) {
-        final tempDir = await getTemporaryDirectory();
-        for (var imagePath in _imagePaths) {
-          final fileExtension = imagePath.split('.').last;
+    if (_isMediaSelected) {
+      if (_mediaPaths.isNotEmpty) {
+        for (var mediaPath in _mediaPaths) {
+          final fileExtension = mediaPath.split('.').last;
           body['format'] = fileExtension;
-          await _uploadImage(imagePath, body);
+          await _uploadMedia(mediaPath, body);
         }
       } else if (_imageData != null) {
         final tempDir = await getTemporaryDirectory();
         final file = await File('${tempDir.path}/temp_image.png').create();
         await file.writeAsBytes(_imageData!);
-        await _uploadImage(file.path, body);
+        await _uploadMedia(file.path, body);
       }
     } else if (_filePath != null) {
+      _filePaths.add(_filePath!);
       final file = File(_filePath!);
       final fileBytes = await file.readAsBytes();
       final fileBase64 = base64Encode(fileBytes);
@@ -153,22 +157,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  Future<void> _uploadImage(String imagePath, Map<String, dynamic> body) async {
+  Future<void> _uploadMedia(String mediaPath, Map<String, dynamic> body) async {
     final url = Uri.parse('$SERVER_IP/upload');
     final request = http.MultipartRequest('POST', url);
 
     request.fields
         .addAll(body.map((key, value) => MapEntry(key, value.toString())));
-    request.files.add(await http.MultipartFile.fromPath('file', imagePath));
+    request.files.add(await http.MultipartFile.fromPath('file', mediaPath));
 
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
     final responseData = jsonDecode(responseBody);
 
     if (response.statusCode == 201) {
-      print('이미지 업로드 성공');
+      print('미디어 업로드 성공');
     } else {
-      print('이미지 업로드 실패: ${response.statusCode}');
+      print('미디어 업로드 실패: ${response.statusCode}');
     }
   }
 
@@ -236,19 +240,56 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             children: <Widget>[
               ListTile(
                 leading: Icon(Icons.camera_alt),
-                title: Text('사진 찍기'),
+                title: Text('사진 또는 비디오 촬영'),
                 onTap: () async {
                   Navigator.pop(context);
-                  final pickedFile =
-                      await _picker.pickImage(source: ImageSource.camera);
-                  if (pickedFile != null) {
-                    setState(() {
-                      _isImageSelected = true;
-                      _imagePaths.add(pickedFile.path);
-                      _filePath = null;
-                      _imageData = null;
-                    });
-                  }
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return Container(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            ListTile(
+                              leading: Icon(Icons.photo_camera),
+                              title: Text('사진 촬영'),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                final pickedFile = await _picker.pickImage(
+                                    source: ImageSource.camera);
+                                if (pickedFile != null) {
+                                  setState(() {
+                                    _isMediaSelected = true;
+                                    _mediaPaths.add(pickedFile.path);
+                                    _filePath = null;
+                                    _imageData = null;
+                                  });
+                                }
+                              },
+                            ),
+                            ListTile(
+                              leading: Icon(Icons.videocam),
+                              title: Text('비디오 촬영'),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                final pickedFile = await _picker.pickVideo(
+                                    source: ImageSource.camera);
+                                if (pickedFile != null) {
+                                  setState(() {
+                                    _isMediaSelected = true;
+                                    _mediaPaths.add(pickedFile.path);
+                                    _filePath = null;
+                                    _imageData = null;
+                                    _initializeVideoController(pickedFile.path);
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
               ListTile(
@@ -256,16 +297,53 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 title: Text('갤러리에서 선택'),
                 onTap: () async {
                   Navigator.pop(context);
-                  final pickedFile =
-                      await _picker.pickImage(source: ImageSource.gallery);
-                  if (pickedFile != null) {
-                    setState(() {
-                      _isImageSelected = true;
-                      _imagePaths.add(pickedFile.path);
-                      _filePath = null;
-                      _imageData = null;
-                    });
-                  }
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return Container(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            ListTile(
+                              leading: Icon(Icons.photo),
+                              title: Text('사진 선택'),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                final pickedFile = await _picker.pickImage(
+                                    source: ImageSource.gallery);
+                                if (pickedFile != null) {
+                                  setState(() {
+                                    _isMediaSelected = true;
+                                    _mediaPaths.add(pickedFile.path);
+                                    _filePath = null;
+                                    _imageData = null;
+                                  });
+                                }
+                              },
+                            ),
+                            ListTile(
+                              leading: Icon(Icons.video_library),
+                              title: Text('비디오 선택'),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                final pickedFile = await _picker.pickVideo(
+                                    source: ImageSource.gallery);
+                                if (pickedFile != null) {
+                                  setState(() {
+                                    _isMediaSelected = true;
+                                    _mediaPaths.add(pickedFile.path);
+                                    _filePath = null;
+                                    _imageData = null;
+                                    _initializeVideoController(pickedFile.path);
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
               ListTile(
@@ -274,20 +352,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 onTap: () async {
                   Navigator.pop(context);
                   final result = await FilePicker.platform.pickFiles(
-                    type: FileType.custom,
-                    allowedExtensions: [
-                      'jpg',
-                      'png',
-                      'wav',
-                      'mp3',
-                      'pdf',
-                      'doc'
-                    ],
+                    type: FileType.any,
                   );
                   if (result != null) {
                     setState(() {
                       _filePath = result.files.single.path;
-                      _imagePaths.clear();
+                      _filePaths.add(_filePath!);
+                      _mediaPaths.clear();
                       _imageData = null;
                     });
                   }
@@ -298,6 +369,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         );
       },
     );
+  }
+
+  void _initializeVideoController(String videoPath) {
+    _videoController = VideoPlayerController.file(File(videoPath))
+      ..initialize().then((_) {
+        setState(() {}); // 비디오 컨트롤러 초기화 후 UI 업데이트
+        _videoController!.play(); // 비디오 자동 재생
+      });
   }
 
   Future<void> _startRecording() async {
@@ -421,19 +500,23 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
-  void _removeImage(int index) {
+  void _removeMedia(int index) {
     setState(() {
-      _imagePaths.removeAt(index);
-      _selectedImageIndex = null;
+      _mediaPaths.removeAt(index);
+      _selectedMediaIndex = null;
+      if (_mediaPaths.isEmpty) {
+        _videoController?.dispose();
+        _videoController = null;
+      }
     });
   }
 
-  void _toggleImageSelection(int index) {
+  void _toggleMediaSelection(int index) {
     setState(() {
-      if (_selectedImageIndex == index) {
-        _selectedImageIndex = null; // 선택된 이미지가 다시 터치되면 선택 해제
+      if (_selectedMediaIndex == index) {
+        _selectedMediaIndex = null; // 선택된 미디어가 다시 터치되면 선택 해제
       } else {
-        _selectedImageIndex = index; // 해당 이미지를 선택
+        _selectedMediaIndex = index; // 해당 미디어를 선택
       }
     });
   }
@@ -489,38 +572,52 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   ),
                   child: Column(
                     children: [
-                      if (_imagePaths.isNotEmpty)
+                      if (_mediaPaths.isNotEmpty)
                         Expanded(
                           flex: 3,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            itemCount: _imagePaths.length,
+                            itemCount: _mediaPaths.length,
                             itemBuilder: (context, index) {
+                              final filePath = _mediaPaths[index];
+                              final isVideo = filePath.endsWith('.mp4') ||
+                                  filePath.endsWith('.MOV') ||
+                                  filePath.endsWith('.mov');
                               return GestureDetector(
-                                onTap: () => _toggleImageSelection(index),
+                                onTap: () => _toggleMediaSelection(index),
                                 child: Stack(
                                   children: [
                                     Padding(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8.0),
                                       child: AspectRatio(
-                                        aspectRatio: 1.0, // 정사각형 비율 유지
+                                        aspectRatio:
+                                            1.0, // Maintain square aspect ratio
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(
-                                              16.0), // 이미지 모서리 둥글게 설정
-                                          child: Image.file(
-                                            File(_imagePaths[index]),
-                                            fit: BoxFit.contain,
-                                          ),
+                                              16.0), // Rounded corners for media
+                                          child: isVideo
+                                              ? _videoController != null &&
+                                                      _videoController!
+                                                          .value.isInitialized
+                                                  ? VideoPlayer(
+                                                      _videoController!)
+                                                  : Center(
+                                                      child:
+                                                          CircularProgressIndicator())
+                                              : Image.file(
+                                                  File(filePath),
+                                                  fit: BoxFit.cover,
+                                                ),
                                         ),
                                       ),
                                     ),
-                                    if (_selectedImageIndex == index)
+                                    if (_selectedMediaIndex == index)
                                       Positioned(
                                         top: 8,
                                         right: 8,
                                         child: GestureDetector(
-                                          onTap: () => _removeImage(index),
+                                          onTap: () => _removeMedia(index),
                                           child: CircleAvatar(
                                             backgroundColor: Colors.grey,
                                             radius: 16,
@@ -543,8 +640,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           color: Colors.white,
                           padding: EdgeInsets.all(8.0),
                           child: Text(
-                            'File attached: ${_filePath!.split('/').last}',
-                            style: TextStyle(color: Colors.black),
+                            _filePath!.split('/').last,
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
                       Expanded(
