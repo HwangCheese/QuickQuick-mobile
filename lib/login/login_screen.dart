@@ -20,7 +20,7 @@ class _LogInState extends State<LogIn> {
     if (userid == '1111' && password == '1111') {
       // 로컬에서 ID와 PW가 1111인 경우
       USER_ID = userid;
-      await _saveLoginStatus(true);
+      // await _saveLoginStatus(true);
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -43,7 +43,7 @@ class _LogInState extends State<LogIn> {
 
       if (response.statusCode == 200) {
         USER_ID = userid;
-        await _saveLoginStatus(true);
+        // await _saveLoginStatus(true);
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen()),
@@ -57,10 +57,10 @@ class _LogInState extends State<LogIn> {
     }
   }
 
-  Future<void> _saveLoginStatus(bool isLoggedIn) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', isLoggedIn);
-  }
+  // Future<void> _saveLoginStatus(bool isLoggedIn) async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   await prefs.setBool('isLoggedIn', isLoggedIn);
+  // }
 
   @override
   Widget build(BuildContext context) {

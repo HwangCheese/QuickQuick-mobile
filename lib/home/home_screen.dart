@@ -268,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context) => WriteMemoScreen(
           initialText: memos[index]['text'],
           initialColor: memos[index]['color'],
-          initialDataId: memos[index]['dataId'],
+          initialMemoId: memos[index]['dataId'],
           initialImageData: imageData,
         ),
       ),

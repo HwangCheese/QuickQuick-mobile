@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -15,13 +16,13 @@ import '../../globals.dart';
 class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
   final Color? initialColor;
-  final String? initialDataId;
+  String? initialMemoId;
   final Uint8List? initialImageData;
 
   WriteMemoScreen({
     this.initialText,
     this.initialColor,
-    this.initialDataId,
+    this.initialMemoId,
     this.initialImageData,
   });
 
@@ -70,8 +71,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     if (widget.initialColor != null) {
       _backgroundColor = widget.initialColor!;
     }
-    if (widget.initialDataId != null) {
-      _deleteMemoFromServer(widget.initialDataId!);
+    if (widget.initialMemoId != null) {
+      _deleteMemoFromServer(widget.initialMemoId!);
     }
     if (widget.initialImageData != null) {
       _isMediaSelected = true;
@@ -105,58 +106,48 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     super.dispose();
   }
 
+  static String _generateRandomId() {
+    const characters =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return String.fromCharCodes(Iterable.generate(
+        16, (_) => characters.codeUnitAt(random.nextInt(characters.length))));
+  }
+
   Future<void> _saveMemoToServer() async {
-    var url = Uri.parse('$SERVER_IP/data');
-    final Map<String, dynamic> body = {
-      'userId': USER_ID,
-      'format': 'txt',
-      'date': DateTime.now().toIso8601String(),
-      'isOpen': true,
-      'theme': getColorName(_backgroundColor),
-      'posX': 500,
-      'posY': 500,
-      'width': 100,
-      'height': 100,
-      'data_txt': _controller.text,
-      'audio_path': _audioPath,
-    };
+    widget.initialMemoId = _generateRandomId();
+    var url = Uri.parse('$SERVER_IP/memo');
+    var request = http.MultipartRequest('POST', url);
 
-    if (_isMediaSelected) {
-      if (_mediaPaths.isNotEmpty) {
-        for (var mediaPath in _mediaPaths) {
-          final fileExtension = mediaPath.split('.').last;
-          body['format'] = fileExtension;
-          await _uploadMedia(mediaPath, body);
-        }
-      } else if (_imageData != null) {
-        final tempDir = await getTemporaryDirectory();
-        final file = await File('${tempDir.path}/temp_image.png').create();
-        await file.writeAsBytes(_imageData!);
-        await _uploadMedia(file.path, body);
-      }
-    } else if (_filePath != null) {
-      _filePaths.add(_filePath!);
-      final file = File(_filePath!);
-      final fileBytes = await file.readAsBytes();
-      final fileBase64 = base64Encode(fileBytes);
-      final fileExtension = _filePath!.split('.').last;
-      body['file_data'] = fileBase64;
-      body['file_extension'] = fileExtension;
-      body['file_path'] = _filePath;
+    request.fields['userId'] = USER_ID;
+    request.fields['isOpen'] = '1'; // Assuming the memo is public
+    request.fields['theme'] = getColorName(_backgroundColor);
+    request.fields['posX'] = '100'; // Example position and size
+    request.fields['posY'] = '100';
+    request.fields['width'] = '400';
+    request.fields['height'] = '300';
+    request.fields['memo_id'] = widget.initialMemoId!;
+
+    // Adding text content
+    if (_controller.text.isNotEmpty) {
+      request.fields['data_txt'] = _controller.text;
     } else {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(body),
-      );
+      request.fields['data_txt'] = "";
+    }
 
-      if (response.statusCode == 201) {
-        print('메모 저장 성공');
-      } else {
-        print('메모 저장 실패: ${response.statusCode}');
-      }
+    for (var filePath in _mediaPaths) {
+      request.files.add(await http.MultipartFile.fromPath('files', filePath));
+    }
+
+    for (var filePath in _filePaths) {
+      request.files.add(await http.MultipartFile.fromPath('files', filePath));
+    }
+
+    var response = await request.send();
+    if (response.statusCode == 201) {
+      print('메모 저장 성공');
+    } else {
+      print('메모 저장 실패: ${response.statusCode}');
     }
   }
 
@@ -428,14 +419,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _shareMemoWithFriend(String friendUserId) async {
-    final url = Uri.parse('$SERVER_IP/shareMemo');
+    final url = Uri.parse('$SERVER_IP/send-memo');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
-        'from_user_id': USER_ID,
-        'to_user_id': friendUserId,
-        'memo_id': widget.initialDataId,
+        'sourceUserId': USER_ID,
+        'targetUserId': friendUserId,
+        'memoId': widget.initialMemoId,
       }),
     );
 
@@ -443,6 +434,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       print('메모 공유 성공');
       _showMessage('메모가 성공적으로 공유되었습니다.');
     } else {
+      print('$USER_ID, $friendUserId, ${widget.initialMemoId}');
       print('메모 공유 실패: ${response.statusCode}');
       _showMessage('메모 공유에 실패했습니다.');
     }
@@ -575,7 +567,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               'text': _controller.text,
               'color': _backgroundColor,
               'isPinned': false,
-              'dataId': widget.initialDataId,
+              'dataId': widget.initialMemoId,
             });
           },
         ),
