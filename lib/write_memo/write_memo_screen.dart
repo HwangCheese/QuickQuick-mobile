@@ -1,15 +1,15 @@
-import 'dart:math';
-import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_sound/flutter_sound.dart';
 import 'dart:io';
-import 'package:video_player/video_player.dart';
+import 'dart:typed_data';
+import 'dart:math';
 
 import '../../globals.dart';
 
@@ -48,11 +48,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   List<VideoPlayerController?> _videoControllers = [];
 
   Map<String, Color> colorMap = {
+    'white': Colors.white,
     'pink': Colors.pink[100]!,
     'blue': Colors.blue[100]!,
     'green': Colors.green[100]!,
     'orange': Colors.orange[100]!,
     'yellow': Colors.yellow[100]!,
+    'purple': Colors.purple[100]!,
+    'grey': Colors.grey[300]!,
   };
 
   String getColorName(Color color) {
@@ -187,13 +190,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               GridView.count(
                 shrinkWrap: true,
                 crossAxisCount: 3,
-                children: <Color>[
-                  Colors.pink[100]!,
-                  Colors.blue[100]!,
-                  Colors.green[100]!,
-                  Colors.orange[100]!,
-                  Colors.yellow[100]!,
-                ].map((Color color) {
+                children: colorMap.values.map((Color color) {
                   return GestureDetector(
                     onTap: () {
                       FocusManager.instance.primaryFocus?.unfocus();
@@ -553,188 +550,241 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-
+    debugPrint('Color Map Entries: ${colorMap.entries}');
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Color(0xFFE2F1FF), // 기존 파란색 배경 유지
       appBar: AppBar(
-        backgroundColor: Color(0xFFE2F1FF), // AppBar 배경도 파란색으로 유지
-        leading: BackButton(
-          color: Colors.black, // 뒤로가기 버튼 색상 설정
-          onPressed: () async {
-            await _saveMemoToServer();
-            Navigator.pop(context, {
-              'text': _controller.text,
-              'color': _backgroundColor,
-              'isPinned': false,
-              'dataId': widget.initialMemoId,
-            });
-          },
+        backgroundColor: Color(0xFFE2F1FF), // AppBar 배경색
+        leading: Padding(
+          padding: const EdgeInsets.only(
+              left: 16.0), // Left padding for the back button
+          child: BackButton(
+            color: Colors.black, // 뒤로가기 버튼 색상
+            onPressed: () async {
+              await _saveMemoToServer();
+              Navigator.pop(context, {
+                'text': _controller.text,
+                'color': _backgroundColor,
+                'isPinned': false,
+                'dataId': widget.initialMemoId,
+              });
+            },
+          ),
         ),
-        title:
-            Text('메모 작성', style: TextStyle(color: Colors.black)), // 제목 글자 색상 설정
+        title: Text('메모 작성', style: TextStyle(color: Colors.black)), // 제목 글자 색상
+        actions: <Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16.0), // Horizontal padding for actions
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: <Widget>[
+                SizedBox(width: 16.0), // Add space between icons
+                IconButton(
+                  iconSize: 30.0,
+                  icon: const Icon(Icons.attach_file),
+                  onPressed: _pickImageOrFile,
+                ),
+                SizedBox(width: 16.0), // Add space between icons
+                IconButton(
+                  iconSize: 30.0,
+                  icon: _isRecording
+                      ? Icon(Icons.stop, color: Colors.red)
+                      : Icon(CupertinoIcons.mic),
+                  onPressed: _isRecording ? _stopRecording : _startRecording,
+                ),
+                SizedBox(width: 16.0), // Add space between icons
+                IconButton(
+                  iconSize: 30.0,
+                  icon: const Icon(Icons.edit_note),
+                  onPressed: () {},
+                ),
+                SizedBox(width: 16.0), // Add space between icons
+                IconButton(
+                  iconSize: 30.0,
+                  icon: Icon(Icons.send_rounded, color: Colors.black),
+                  onPressed: _saveAndShareMemo,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+
       body: GestureDetector(
         onTap: () {
           FocusScope.of(context).unfocus(); // 키보드 내리기
         },
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Container(
-                  width: screenWidth * 0.9,
-                  height: screenHeight * 0.6,
-                  decoration: BoxDecoration(
-                    color: Colors.white, // 이미지와 메모 영역 배경을 흰색으로 설정
-                    borderRadius: BorderRadius.circular(16.0), // 모서리를 둥글게 설정
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8.0,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      if (_mediaPaths.isNotEmpty)
-                        Expanded(
-                          flex: 3,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _mediaPaths.length,
-                            itemBuilder: (context, index) {
-                              final filePath = _mediaPaths[index];
-                              final isVideo = filePath.endsWith('.mp4') ||
-                                  filePath.endsWith('.MOV') ||
-                                  filePath.endsWith('.mov');
-                              return GestureDetector(
-                                onTap: () => _toggleMediaSelection(index),
-                                child: Stack(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8.0),
-                                      child: AspectRatio(
-                                        aspectRatio:
-                                            1.0, // Maintain square aspect ratio
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                              16.0), // Rounded corners for media
-                                          child: isVideo
-                                              ? _videoControllers[index] !=
-                                                          null &&
-                                                      _videoControllers[index]!
-                                                          .value
-                                                          .isInitialized
-                                                  ? VideoPlayer(
-                                                      _videoControllers[index]!)
-                                                  : Center(
-                                                      child:
-                                                          CircularProgressIndicator())
-                                              : Image.file(
-                                                  File(filePath),
-                                                  fit: BoxFit.cover,
-                                                ),
-                                        ),
-                                      ),
-                                    ),
-                                    if (_selectedMediaIndex == index)
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: GestureDetector(
-                                          onTap: () => _removeMedia(index),
-                                          child: CircleAvatar(
-                                            backgroundColor: Colors.grey,
-                                            radius: 16,
-                                            child: Icon(
-                                              Icons.close,
-                                              size: 16,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      if (_filePath != null)
-                        Container(
-                          color: Colors.white,
-                          padding: EdgeInsets.all(8.0),
-                          child: Text(
-                            _filePath!.split('/').last,
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          maxLines: null,
-                          expands: true,
-                          textAlignVertical: TextAlignVertical.top,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white, // 메모 입력 필드 배경을 흰색으로 설정
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                  16.0), // 텍스트 필드 모서리를 둥글게 설정
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 70.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    IconButton(
-                      iconSize: 45.0,
-                      icon: const Icon(CupertinoIcons.paintbrush),
-                      onPressed: _showColorPicker,
-                    ),
-                    IconButton(
-                      iconSize: 45.0,
-                      icon: const Icon(Icons.attach_file),
-                      onPressed: _pickImageOrFile,
-                    ),
-                    IconButton(
-                      iconSize: 45.0,
-                      icon: _isRecording
-                          ? Icon(Icons.stop, color: Colors.red)
-                          : Icon(CupertinoIcons.mic),
-                      onPressed:
-                          _isRecording ? _stopRecording : _startRecording,
-                    ),
-                    IconButton(
-                      iconSize: 45.0,
-                      icon: const Icon(Icons.edit_note),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      iconSize: 45.0,
-                      icon: const Icon(Icons.send_rounded),
-                      onPressed: _saveAndShareMemo,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(height: 20.0),
+              Container(
+                width: screenWidth * 0.9,
+                height: screenHeight * 0.6,
+                decoration: BoxDecoration(
+                  color: _backgroundColor,
+                  borderRadius: BorderRadius.circular(16.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8.0,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
-              ],
-            ),
+                child: Column(
+                  children: [
+                    if (_mediaPaths.isNotEmpty)
+                      Expanded(
+                        flex: 3,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _mediaPaths.length,
+                          itemBuilder: (context, index) {
+                            final filePath = _mediaPaths[index];
+                            final isVideo = filePath.endsWith('.mp4') ||
+                                filePath.endsWith('.MOV') ||
+                                filePath.endsWith('.mov');
+                            return GestureDetector(
+                              onTap: () => _toggleMediaSelection(index),
+                              child: Stack(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8.0, horizontal: 8.0),
+                                    child: AspectRatio(
+                                      aspectRatio:
+                                          1.0, // Maintain square aspect ratio
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(
+                                            16.0), // Rounded corners for media
+                                        child: isVideo
+                                            ? _videoControllers[index] !=
+                                                        null &&
+                                                    _videoControllers[index]!
+                                                        .value
+                                                        .isInitialized
+                                                ? VideoPlayer(
+                                                    _videoControllers[index]!)
+                                                : Center(
+                                                    child:
+                                                        CircularProgressIndicator())
+                                            : Image.file(
+                                                File(filePath),
+                                                fit: BoxFit.cover,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (_selectedMediaIndex == index)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: GestureDetector(
+                                        onTap: () => _removeMedia(index),
+                                        child: CircleAvatar(
+                                          backgroundColor: Colors.grey,
+                                          radius: 16,
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 16,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    if (_filePath != null)
+                      Container(
+                        color: Colors.white,
+                        padding: EdgeInsets.all(8.0),
+                        child: Text(
+                          _filePath!.split('/').last,
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    Expanded(
+                      flex: 5,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
+                        child: TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          focusNode: _focusNode,
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: '메모를 입력하세요...',
+                          ),
+                          style: TextStyle(
+                            fontSize: 16.0,
+                            color: Colors.black,
+                          ),
+                          onChanged: (value) {},
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 20.0),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  color: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Container(
+                    width:
+                        MediaQuery.of(context).size.width, // 텍스트 필드와 가로 길이 맞추기
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: colorMap.entries.map((entry) {
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _backgroundColor = entry.value;
+                              });
+                            },
+                            child: Container(
+                              margin: EdgeInsets.symmetric(horizontal: 3),
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: entry.value,
+                                borderRadius: BorderRadius.circular(20.0),
+                                border: Border.all(
+                                  color: _backgroundColor == entry.value
+                                      ? Colors.black
+                                      : Colors.transparent,
+                                  width: 2.0,
+                                ),
+                              ),
+                              child: Center(
+                                child: _backgroundColor == entry.value
+                                    ? Icon(Icons.check, color: Colors.black)
+                                    : SizedBox.shrink(),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
