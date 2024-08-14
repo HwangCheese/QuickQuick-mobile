@@ -10,8 +10,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
-
 import '../../globals.dart';
+import 'package:sticker_memo/api_service.dart';
 
 class WriteMemoScreen extends StatefulWidget {
   final String? initialText;
@@ -34,7 +34,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final TextEditingController _controller = TextEditingController();
   Color _backgroundColor = Colors.white;
   final FocusNode _focusNode = FocusNode();
-
   final ImagePicker _picker = ImagePicker();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   bool _isRecording = false;
@@ -46,6 +45,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Uint8List? _imageData;
   int? _selectedMediaIndex;
   List<VideoPlayerController?> _videoControllers = [];
+  late ApiService _apiService;
+  late MemoSummarizer _memoSummarizer;
+  String _summary = '';
+  String _originalText = '';
+  bool _isLoading = false;
 
   Map<String, Color> colorMap = {
     'white': Colors.white,
@@ -68,8 +72,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   @override
   void initState() {
     super.initState();
+    _apiService = ApiService();
+    _memoSummarizer = MemoSummarizer(_apiService);
     if (widget.initialText != null) {
       _controller.text = widget.initialText!;
+      _originalText = widget.initialText!; // 저장 원본 텍스트
     }
     if (widget.initialColor != null) {
       _backgroundColor = widget.initialColor!;
@@ -83,6 +90,64 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
     _initRecorder();
     _videoControllers = []; // Initialize as an empty growable list
+  }
+
+  Future<String> getSummary(String text) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://$SERVER_IP/summary'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(<String, String>{
+          'text': text,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data.containsKey('summary')) {
+          return data['summary'] as String;
+        } else {
+          throw Exception('API 응답에서 요약을 찾을 수 없습니다.');
+        }
+      } else {
+        throw Exception('API 호출 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('요약 요청 실패: $e');
+      return '요약을 가져오는 데 실패했습니다.';
+    }
+  }
+
+  Future<void> _summarizeText() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final summary = await _memoSummarizer.getSummary(_controller.text);
+
+      setState(() {
+        _summary = summary;
+      });
+    } catch (e) {
+      print('요약을 가져오는 중 오류 발생: $e');
+      setState(() {
+        _summary = '요약을 가져오는 데 실패했습니다.';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _restoreOriginalText() {
+    setState(() {
+      _controller.text = _originalText;
+      _summary = ''; // 요약 초기화
+    });
   }
 
   Future<void> _deleteMemoFromServer(String dataId) async {
@@ -171,53 +236,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     } else {
       print('미디어 업로드 실패: ${response.statusCode}');
     }
-  }
-
-  void _showColorPicker() {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                '배경색 선택',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 16.0),
-              GridView.count(
-                shrinkWrap: true,
-                crossAxisCount: 3,
-                children: colorMap.values.map((Color color) {
-                  return GestureDetector(
-                    onTap: () {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      setState(() {
-                        _backgroundColor = color;
-                      });
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.all(8.0),
-                      color: color,
-                      width: 50.0,
-                      height: 50.0,
-                      child: Center(
-                        child: _backgroundColor == color
-                            ? Icon(Icons.check, color: Colors.black)
-                            : SizedBox.shrink(),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _pickImageOrFile() async {
@@ -402,6 +420,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  Future<void> _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+    if (result != null) {
+      final file = File(result.files.single.path!);
+      setState(() {
+        _filePath = file.path;
+        _filePaths.add(_filePath!);
+      });
+    }
+  }
+
   Future<void> _saveAndShareMemo() async {
     try {
       // 메모를 서버에 저장합니다.
@@ -546,7 +576,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
-  @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -562,12 +591,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           child: BackButton(
             color: Colors.black, // 뒤로가기 버튼 색상
             onPressed: () async {
-              await _saveMemoToServer();
+              await _saveMemoToServer(); // 메모를 서버에 저장
               Navigator.pop(context, {
                 'text': _controller.text,
                 'color': _backgroundColor,
-                'isPinned': false,
-                'dataId': widget.initialMemoId,
+                'memo_id': widget.initialMemoId,
               });
             },
           ),
@@ -598,7 +626,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 IconButton(
                   iconSize: 30.0,
                   icon: const Icon(Icons.edit_note),
-                  onPressed: () {},
+                  onPressed: () async {
+                    await _summarizeText(); // 텍스트 요약 요청
+                  },
                 ),
                 SizedBox(width: 16.0), // Add space between icons
                 IconButton(
@@ -737,6 +767,47 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   ],
                 ),
               ),
+              SizedBox(height: 20.0),
+              if (_summary.isNotEmpty)
+                Container(
+                  width: screenWidth * 0.9,
+                  padding: EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8.0,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '요약:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18.0,
+                        ),
+                      ),
+                      SizedBox(height: 8.0),
+                      Text(
+                        _summary,
+                        style: TextStyle(
+                          fontSize: 16.0,
+                        ),
+                      ),
+                      if (_originalText.isNotEmpty) // 원본 텍스트로 복원 버튼
+                        TextButton(
+                          onPressed: _restoreOriginalText,
+                          child: Text('원본으로 되돌리기'),
+                        ),
+                    ],
+                  ),
+                ),
               SizedBox(height: 20.0),
               Align(
                 alignment: Alignment.bottomCenter,
