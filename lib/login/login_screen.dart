@@ -1,181 +1,155 @@
+import 'dart:convert'; // jsonEncode를 사용하기 위해 import
+import '../../globals.dart';
 import 'package:flutter/material.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../home/home_screen.dart';
-import 'package:sticker_memo/globals.dart';
 
-class LogIn extends StatefulWidget {
-  const LogIn({super.key});
-
-  @override
-  State<LogIn> createState() => _LogInState();
-}
-
-class _LogInState extends State<LogIn> {
-  TextEditingController controller = TextEditingController();
-  TextEditingController controller2 = TextEditingController();
-
-  Future<void> loginUser(String userid, String password) async {
-    if (userid == '1111' && password == '1111') {
-      // 로컬에서 ID와 PW가 1111인 경우
-      USER_ID = userid;
-      // await _saveLoginStatus(true);
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-      );
-      return;
-    }
-
-    final url = Uri.parse('$SERVER_IP/login');
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'user_id': userid,
-          'user_pw': password,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        USER_ID = userid;
-        // await _saveLoginStatus(true);
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-        );
-      } else {
-        final responseBody = jsonDecode(response.body);
-        showSnackBar(context, Text(responseBody['error']));
-      }
-    } catch (e) {
-      showSnackBar(context, Text('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.'));
-    }
-  }
-
-  // Future<void> _saveLoginStatus(bool isLoggedIn) async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   await prefs.setBool('isLoggedIn', isLoggedIn);
-  // }
-
+class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        body: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Padding(padding: EdgeInsets.only(top: 50)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 50.0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Sign In',
-                      style: TextStyle(
-                        fontSize: 40.0,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 35.0),
-                Form(
-                  child: Container(
-                    padding: EdgeInsets.all(40.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextField(
-                          controller: controller,
-                          autofocus: true,
-                          decoration: InputDecoration(
-                            hintText: '전화번호',
-                            fillColor: Color(0xFFE2F1FF),
-                            filled: true,
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 24.0, vertical: 12.0),
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 5.0),
-                              child: Icon(Icons.local_post_office_outlined,
-                                  size: 24.0, color: Colors.grey),
-                            ),
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        SizedBox(height: 20.0),
-                        TextField(
-                          controller: controller2,
-                          decoration: InputDecoration(
-                            hintText: '비밀번호(4자리)',
-                            fillColor: Color(0xFFE2F1FF),
-                            filled: true,
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 24.0, vertical: 12.0),
-                            prefixIcon: Padding(
-                              padding: const EdgeInsets.only(left: 5.0),
-                              child: Icon(Icons.lock_outline,
-                                  size: 24.0, color: Colors.grey),
-                            ),
-                          ),
-                          keyboardType: TextInputType.text,
-                          obscureText: true,
-                        ),
-                        SizedBox(height: 40.0),
-                        Center(
-                          child: SizedBox(
-                            width: 180,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                loginUser(controller.text, controller2.text);
-                              },
-                              child: Text(
-                                '로그인',
-                                style: TextStyle(
-                                  fontSize: 18.0,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFFCDE9FF),
-                                  minimumSize: Size(double.infinity, 50),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30.0),
-                                  )),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return MaterialApp(
+      home: Login(),
     );
   }
 }
 
-void showSnackBar(BuildContext context, Text text) {
-  final snackBar = SnackBar(
-    content: text,
-    backgroundColor: const Color.fromARGB(255, 112, 48, 48),
-  );
+class Login extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() => _LoginState();
+}
 
-  ScaffoldMessenger.of(context).showSnackBar(snackBar);
+class _LoginState extends State<Login> {
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  QRViewController? qrViewController;
+  String? scanResult; // QR 코드에서 읽은 데이터를 저장할 변수
+  bool showLoginButton = false; // 로그인 버튼을 보여줄지 여부를 결정하는 변수
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('QR을 스캔하여 퀵퀵이 서비스를 이용하세요'),
+      ),
+      body: Column(
+        children: <Widget>[
+          Expanded(
+            flex: 4,
+            child: QRView(
+              key: qrKey,
+              onQRViewCreated: _onQRViewCreated,
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Center(
+              child: showLoginButton
+                  ? ElevatedButton(
+                      onPressed: _handleLogin,
+                      child: Text('로그인'),
+                    )
+                  : Text('스캔한 데이터: ${scanResult ?? '없음'}'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onQRViewCreated(QRViewController controller) {
+    setState(() {
+      qrViewController = controller;
+    });
+
+    controller.scannedDataStream.listen((scanData) {
+      setState(() {
+        scanResult = scanData.code;
+        showLoginButton = true; // QR 코드 스캔 후 버튼을 보여줍니다.
+      });
+    });
+  }
+
+  Future<void> _handleLogin() async {
+    if (scanResult == null) {
+      return;
+    }
+
+    // QR 코드에서 받은 데이터를 바로 사용 (이제 토큰만 포함됨)
+    final String token = scanResult!;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$SERVER_IP/login-mobile'), // 로그인 요청 URL
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'token': token, // 토큰만 전달합니다.
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('로그인 성공: ${token}');
+
+        // 로그인 성공 후 사용자 ID를 가져오는 함수 호출
+        final String? userId = await _fetchUserId(token);
+
+        if (userId != null) {
+          print('사용자 ID: $userId');
+          USER_ID = userId;
+
+          // 홈 화면으로 이동
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreen()),
+          );
+        } else {
+          print('사용자 ID 가져오기 실패');
+        }
+      } else {
+        print('로그인 실패: ${response.statusCode}');
+        print('응답 본문: ${response.body}');
+      }
+    } catch (e) {
+      print('로그인 요청 오류: $e');
+    }
+  }
+
+  Future<String?> _fetchUserId(String token) async {
+    try {
+      // 쿼리 파라미터로 토큰을 전달하기 위해 Uri를 생성
+      final uri = Uri.parse('$SERVER_IP/get-userid').replace(queryParameters: {
+        'token': token,
+      });
+
+      final response = await http.get(
+        uri, // 쿼리 파라미터가 포함된 URI
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        USER_ID = responseData['id'];
+        USER_NAME = responseData['name'];
+        print('사용자 이름: $USER_NAME');
+        return USER_ID; // 응답에서 사용자 ID를 추출
+      } else {
+        print('사용자 ID 요청 실패: ${response.statusCode}');
+        print('응답 본문: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('사용자 ID 요청 오류: $e');
+      return null;
+    }
+  }
+
+  @override
+  void dispose() {
+    qrViewController?.dispose();
+    super.dispose();
+  }
 }

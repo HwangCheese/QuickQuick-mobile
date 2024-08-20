@@ -11,16 +11,13 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 import '../../globals.dart';
-import 'package:sticker_memo/api_service.dart';
 
 class WriteMemoScreen extends StatefulWidget {
-  final String? initialText;
   final Color? initialColor;
   String? initialMemoId;
   final Uint8List? initialImageData;
 
   WriteMemoScreen({
-    this.initialText,
     this.initialColor,
     this.initialMemoId,
     this.initialImageData,
@@ -45,11 +42,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Uint8List? _imageData;
   int? _selectedMediaIndex;
   List<VideoPlayerController?> _videoControllers = [];
-  late ApiService _apiService;
-  late MemoSummarizer _memoSummarizer;
   String _summary = '';
   String _originalText = '';
-  bool _isLoading = false;
+  bool _isLoading = true; // 로딩 상태를 추가
 
   Map<String, Color> colorMap = {
     'white': Colors.white,
@@ -72,24 +67,94 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   @override
   void initState() {
     super.initState();
-    _apiService = ApiService();
-    _memoSummarizer = MemoSummarizer(_apiService);
-    if (widget.initialText != null) {
-      _controller.text = widget.initialText!;
-      _originalText = widget.initialText!; // 저장 원본 텍스트
-    }
-    if (widget.initialColor != null) {
-      _backgroundColor = widget.initialColor!;
-    }
-    if (widget.initialMemoId != null) {
-      _deleteMemoFromServer(widget.initialMemoId!);
-    }
-    if (widget.initialImageData != null) {
-      _isMediaSelected = true;
-      _imageData = widget.initialImageData;
-    }
+    _initializeMemoData();
     _initRecorder();
-    _videoControllers = []; // Initialize as an empty growable list
+    _videoControllers = [];
+  }
+
+  Future<void> _initializeMemoData() async {
+    if (widget.initialMemoId != null) {
+      await _fetchMemoDetails(widget.initialMemoId!);
+    } else {
+      if (widget.initialColor != null) {
+        _backgroundColor = widget.initialColor!;
+      }
+      if (widget.initialImageData != null) {
+        _isMediaSelected = true;
+        _imageData = widget.initialImageData;
+      }
+    }
+
+    setState(() {
+      _isLoading = false; // 로딩 상태 업데이트
+    });
+  }
+
+  Future<void> _fetchMemoDetails(String memoId) async {
+    final url = Uri.parse('$SERVER_IP/memo/$memoId/data');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final List<dynamic> memoData = json.decode(response.body);
+
+        for (var item in memoData) {
+          if (item['format'] == 'txt') {
+            final text = await _getData(item['data_id']);
+            setState(() {
+              _controller.text = text ?? '';
+            });
+          } else {
+            final image = await _getImage(item['data_id']);
+            if (image != null) {
+              setState(() {
+                _imageData = image;
+                _isMediaSelected = true;
+              });
+            }
+          }
+        }
+      } else {
+        print('Failed to load memo datas: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Failed to load memo datas: $e');
+    } finally {
+      setState(() {
+        _isLoading = false; // 데이터 로드가 끝난 후 로딩 상태 해제
+      });
+    }
+  }
+
+  Future<String?> _getData(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return utf8.decode(response.bodyBytes);
+      } else {
+        print('파일 불러오기 실패: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('파일 불러오기 실패!!: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List?> _getImage(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        print('Failed to load image: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('이미지 불러오기 실패: $e');
+      return null;
+    }
   }
 
   Future<String> getSummary(String text) async {
@@ -118,36 +183,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       print('요약 요청 실패: $e');
       return '요약을 가져오는 데 실패했습니다.';
     }
-  }
-
-  Future<void> _summarizeText() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final summary = await _memoSummarizer.getSummary(_controller.text);
-
-      setState(() {
-        _summary = summary;
-      });
-    } catch (e) {
-      print('요약을 가져오는 중 오류 발생: $e');
-      setState(() {
-        _summary = '요약을 가져오는 데 실패했습니다.';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _restoreOriginalText() {
-    setState(() {
-      _controller.text = _originalText;
-      _summary = ''; // 요약 초기화
-    });
   }
 
   Future<void> _deleteMemoFromServer(String dataId) async {
@@ -196,7 +231,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     request.fields['height'] = '300';
     request.fields['memo_id'] = widget.initialMemoId!;
 
-    // Adding text content
     if (_controller.text.isNotEmpty) {
       request.fields['data_txt'] = _controller.text;
     } else {
@@ -468,14 +502,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _showFriendSelectionDialog() async {
-    final response =
-        await http.get(Uri.parse('${SERVER_IP}/friends/${USER_ID}'));
+    final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-                'user_id': friend['user_id'],
-                'user_name': friend['user_name'],
+                'user_name': friend['friend_name'],
+                'user_id': friend['friend_id'],
               })
           .toList();
 
@@ -576,22 +609,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    debugPrint('Color Map Entries: ${colorMap.entries}');
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      backgroundColor: Color(0xFFE2F1FF), // 기존 파란색 배경 유지
+      backgroundColor: Color(0xFFE2F1FF),
       appBar: AppBar(
-        backgroundColor: Color(0xFFE2F1FF), // AppBar 배경색
+        backgroundColor: Color(0xFFE2F1FF),
         leading: Padding(
-          padding: const EdgeInsets.only(
-              left: 16.0), // Left padding for the back button
+          padding: const EdgeInsets.only(left: 16.0),
           child: BackButton(
-            color: Colors.black, // 뒤로가기 버튼 색상
+            color: Colors.black,
             onPressed: () async {
-              await _saveMemoToServer(); // 메모를 서버에 저장
+              await _saveMemoToServer();
               Navigator.pop(context, {
                 'text': _controller.text,
                 'color': _backgroundColor,
@@ -600,21 +633,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             },
           ),
         ),
-        title: Text('메모 작성', style: TextStyle(color: Colors.black)), // 제목 글자 색상
+        title: Text('메모 작성', style: TextStyle(color: Colors.black)),
         actions: <Widget>[
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16.0), // Horizontal padding for actions
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: <Widget>[
-                SizedBox(width: 16.0), // Add space between icons
                 IconButton(
                   iconSize: 30.0,
                   icon: const Icon(Icons.attach_file),
                   onPressed: _pickImageOrFile,
                 ),
-                SizedBox(width: 16.0), // Add space between icons
+                SizedBox(width: 16.0),
                 IconButton(
                   iconSize: 30.0,
                   icon: _isRecording
@@ -622,15 +653,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       : Icon(CupertinoIcons.mic),
                   onPressed: _isRecording ? _stopRecording : _startRecording,
                 ),
-                SizedBox(width: 16.0), // Add space between icons
+                SizedBox(width: 16.0),
                 IconButton(
                   iconSize: 30.0,
                   icon: const Icon(Icons.edit_note),
-                  onPressed: () async {
-                    await _summarizeText(); // 텍스트 요약 요청
-                  },
+                  onPressed: () {},
                 ),
-                SizedBox(width: 16.0), // Add space between icons
+                SizedBox(width: 16.0),
                 IconButton(
                   iconSize: 30.0,
                   icon: Icon(Icons.send_rounded, color: Colors.black),
@@ -641,224 +670,202 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           ),
         ],
       ),
-
-      body: GestureDetector(
-        onTap: () {
-          FocusScope.of(context).unfocus(); // 키보드 내리기
-        },
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              SizedBox(height: 20.0),
-              Container(
-                width: screenWidth * 0.9,
-                height: screenHeight * 0.6,
-                decoration: BoxDecoration(
-                  color: _backgroundColor,
-                  borderRadius: BorderRadius.circular(16.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8.0,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator()) // 로딩 중일 때는 로딩 인디케이터 표시
+          : GestureDetector(
+              onTap: () {
+                FocusScope.of(context).unfocus(); // 키보드 내리기
+              },
+              child: SingleChildScrollView(
                 child: Column(
-                  children: [
-                    if (_mediaPaths.isNotEmpty)
-                      Expanded(
-                        flex: 3,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _mediaPaths.length,
-                          itemBuilder: (context, index) {
-                            final filePath = _mediaPaths[index];
-                            final isVideo = filePath.endsWith('.mp4') ||
-                                filePath.endsWith('.MOV') ||
-                                filePath.endsWith('.mov');
-                            return GestureDetector(
-                              onTap: () => _toggleMediaSelection(index),
-                              child: Stack(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 8.0, horizontal: 8.0),
-                                    child: AspectRatio(
-                                      aspectRatio:
-                                          1.0, // Maintain square aspect ratio
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(
-                                            16.0), // Rounded corners for media
-                                        child: isVideo
-                                            ? _videoControllers[index] !=
-                                                        null &&
-                                                    _videoControllers[index]!
-                                                        .value
-                                                        .isInitialized
-                                                ? VideoPlayer(
-                                                    _videoControllers[index]!)
-                                                : Center(
-                                                    child:
-                                                        CircularProgressIndicator())
-                                            : Image.file(
-                                                File(filePath),
-                                                fit: BoxFit.cover,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (_selectedMediaIndex == index)
-                                    Positioned(
-                                      top: 8,
-                                      right: 8,
-                                      child: GestureDetector(
-                                        onTap: () => _removeMedia(index),
-                                        child: CircleAvatar(
-                                          backgroundColor: Colors.grey,
-                                          radius: 16,
-                                          child: Icon(
-                                            Icons.close,
-                                            size: 16,
-                                            color: Colors.white,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    SizedBox(height: 20.0),
+                    Container(
+                      width: screenWidth * 0.9,
+                      height: screenHeight * 0.6,
+                      decoration: BoxDecoration(
+                        color: _backgroundColor,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8.0,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          if (_mediaPaths.isNotEmpty)
+                            Expanded(
+                              flex: 3,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _mediaPaths.length,
+                                itemBuilder: (context, index) {
+                                  final filePath = _mediaPaths[index];
+                                  final isVideo = filePath.endsWith('.mp4') ||
+                                      filePath.endsWith('.MOV') ||
+                                      filePath.endsWith('.mov');
+                                  return GestureDetector(
+                                    onTap: () => _toggleMediaSelection(index),
+                                    child: Stack(
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 8.0, horizontal: 8.0),
+                                          child: AspectRatio(
+                                            aspectRatio: 1.0,
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(16.0),
+                                              child: isVideo
+                                                  ? _videoControllers[index] !=
+                                                              null &&
+                                                          _videoControllers[
+                                                                  index]!
+                                                              .value
+                                                              .isInitialized
+                                                      ? VideoPlayer(
+                                                          _videoControllers[
+                                                              index]!)
+                                                      : Center(
+                                                          child:
+                                                              CircularProgressIndicator())
+                                                  : Image.file(
+                                                      File(filePath),
+                                                      fit: BoxFit.cover,
+                                                    ),
+                                            ),
                                           ),
                                         ),
+                                        if (_selectedMediaIndex == index)
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: GestureDetector(
+                                              onTap: () => _removeMedia(index),
+                                              child: CircleAvatar(
+                                                backgroundColor: Colors.grey,
+                                                radius: 16,
+                                                child: Icon(
+                                                  Icons.close,
+                                                  size: 16,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          if (_filePath != null)
+                            Container(
+                              color: Colors.white,
+                              padding: EdgeInsets.all(8.0),
+                              child: Text(
+                                _filePath!.split('/').last,
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                          Expanded(
+                            flex: 5,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: TextField(
+                                controller: _controller,
+                                maxLines: null,
+                                focusNode: _focusNode,
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: '메모를 입력하세요...',
+                                ),
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  color: Colors.black,
+                                ),
+                                onChanged: (value) {},
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 20.0),
+                    if (_summary.isNotEmpty)
+                      Container(
+                        width: screenWidth * 0.9,
+                        padding: EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8.0,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    SizedBox(height: 20.0),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        color: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Container(
+                          width: MediaQuery.of(context).size.width,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: colorMap.entries.map((entry) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _backgroundColor = entry.value;
+                                    });
+                                  },
+                                  child: Container(
+                                    margin: EdgeInsets.symmetric(horizontal: 3),
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: entry.value,
+                                      borderRadius: BorderRadius.circular(20.0),
+                                      border: Border.all(
+                                        color: _backgroundColor == entry.value
+                                            ? Colors.black
+                                            : Colors.transparent,
+                                        width: 2.0,
                                       ),
                                     ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    if (_filePath != null)
-                      Container(
-                        color: Colors.white,
-                        padding: EdgeInsets.all(8.0),
-                        child: Text(
-                          _filePath!.split('/').last,
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 18,
+                                    child: Center(
+                                      child: _backgroundColor == entry.value
+                                          ? Icon(Icons.check,
+                                              color: Colors.black)
+                                          : SizedBox.shrink(),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        ),
-                      ),
-                    Expanded(
-                      flex: 5,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: TextField(
-                          controller: _controller,
-                          maxLines: null,
-                          focusNode: _focusNode,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            hintText: '메모를 입력하세요...',
-                          ),
-                          style: TextStyle(
-                            fontSize: 16.0,
-                            color: Colors.black,
-                          ),
-                          onChanged: (value) {},
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: 20.0),
-              if (_summary.isNotEmpty)
-                Container(
-                  width: screenWidth * 0.9,
-                  padding: EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8.0,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '요약:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18.0,
-                        ),
-                      ),
-                      SizedBox(height: 8.0),
-                      Text(
-                        _summary,
-                        style: TextStyle(
-                          fontSize: 16.0,
-                        ),
-                      ),
-                      if (_originalText.isNotEmpty) // 원본 텍스트로 복원 버튼
-                        TextButton(
-                          onPressed: _restoreOriginalText,
-                          child: Text('원본으로 되돌리기'),
-                        ),
-                    ],
-                  ),
-                ),
-              SizedBox(height: 20.0),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  color: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Container(
-                    width:
-                        MediaQuery.of(context).size.width, // 텍스트 필드와 가로 길이 맞추기
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: colorMap.entries.map((entry) {
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _backgroundColor = entry.value;
-                              });
-                            },
-                            child: Container(
-                              margin: EdgeInsets.symmetric(horizontal: 3),
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: entry.value,
-                                borderRadius: BorderRadius.circular(20.0),
-                                border: Border.all(
-                                  color: _backgroundColor == entry.value
-                                      ? Colors.black
-                                      : Colors.transparent,
-                                  width: 2.0,
-                                ),
-                              ),
-                              child: Center(
-                                child: _backgroundColor == entry.value
-                                    ? Icon(Icons.check, color: Colors.black)
-                                    : SizedBox.shrink(),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

@@ -33,15 +33,14 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
   }
 
   Future<void> _fetchFriends() async {
-    final response =
-        await http.get(Uri.parse('${SERVER_IP}/friends/${USER_ID}'));
+    final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
+      print(data);
       setState(() {
         friends = data
             .map<Map<String, String>>((friend) => {
-                  'user_id': friend['user_id'],
-                  'user_name': friend['user_name'],
+                  'user_name': friend['friend_name'],
                 })
             .toList();
         filteredFriends = friends;
@@ -55,20 +54,22 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     await _fetchFriends();
   }
 
-  Future<void> _addFriend(String friendUserId) async {
+  Future<void> _addFriend(String friendUserName) async {
+    print('친구 이름: $friendUserName');
     final response = await http.post(
       Uri.parse('${SERVER_IP}/friend'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
       },
       body: jsonEncode(<String, String>{
-        'user_id': USER_ID,
-        'friend_user_id': friendUserId,
+        'user_name': USER_NAME,
+        'friend_user_name': friendUserName,
       }),
     );
 
     if (response.statusCode == 201) {
       // 친구 추가 성공 후, 친구 목록을 새로고침하여 UI를 즉시 업데이트
+      print('친구 추가 성공');
       await _fetchFriends();
     } else {
       _showMessage('친구 추가 실패: ${json.decode(response.body)['error']}');
@@ -225,7 +226,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
           title: Text('친구 추가'),
           content: TextField(
             controller: _newFriendController,
-            decoration: InputDecoration(hintText: '아이디로 검색하세요'),
+            decoration: InputDecoration(hintText: '친구 이름으로 검색하세요'),
           ),
           actions: <Widget>[
             TextButton(
