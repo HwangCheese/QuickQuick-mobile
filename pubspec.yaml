@@ -14,7 +14,8 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.6
-  http: ^0.13.4
+  qr_code_scanner: ^1.0.1
+  http: ^1.2.2
   table_calendar: ^3.0.3
   intl: any
   image_picker: ^0.8.4+11
