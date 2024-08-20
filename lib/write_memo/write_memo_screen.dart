@@ -75,6 +75,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Future<void> _initializeMemoData() async {
     if (widget.initialMemoId != null) {
       await _fetchMemoDetails(widget.initialMemoId!);
+      _deleteMemoFromServer(widget.initialMemoId!);
     } else {
       if (widget.initialColor != null) {
         _backgroundColor = widget.initialColor!;
@@ -185,9 +186,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  Future<void> _deleteMemoFromServer(String dataId) async {
-    final url = Uri.parse('$SERVER_IP/data/$dataId');
+  Future<void> _deleteMemoFromServer(String memoId) async {
+    if (memoId == null) return;
+
+    final url = Uri.parse('$SERVER_IP/memo/$memoId');
     final response = await http.delete(url);
+
     if (response.statusCode == 200) {
       print('메모 삭제 성공');
     } else {
@@ -272,7 +276,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  Future<void> _pickImageOrFile() async {
+  void _pickImageOrFile() async {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -304,7 +308,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   setState(() {
                                     _isMediaSelected = true;
                                     _mediaPaths.add(pickedFile.path);
-                                    _filePath = null;
                                     _imageData = null;
                                     _videoControllers.add(null);
                                   });
@@ -322,7 +325,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   setState(() {
                                     _isMediaSelected = true;
                                     _mediaPaths.add(pickedFile.path);
-                                    _filePath = null;
                                     _imageData = null;
                                     _videoControllers.add(null);
                                     _initializeVideoController(pickedFile.path,
@@ -361,7 +363,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   setState(() {
                                     _isMediaSelected = true;
                                     _mediaPaths.add(pickedFile.path);
-                                    _filePath = null;
                                     _imageData = null;
                                     _videoControllers.add(null);
                                   });
@@ -379,7 +380,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   setState(() {
                                     _isMediaSelected = true;
                                     _mediaPaths.add(pickedFile.path);
-                                    _filePath = null;
                                     _imageData = null;
                                     _videoControllers.add(null);
                                     _initializeVideoController(pickedFile.path,
@@ -407,9 +407,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     setState(() {
                       _filePath = result.files.single.path;
                       _filePaths.add(_filePath!);
-                      _mediaPaths.clear();
-                      _videoControllers.clear();
-                      _imageData = null;
                     });
                   }
                 },
@@ -699,68 +696,162 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         children: [
                           if (_mediaPaths.isNotEmpty)
                             Expanded(
-                              flex: 3,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _mediaPaths.length,
-                                itemBuilder: (context, index) {
-                                  final filePath = _mediaPaths[index];
-                                  final isVideo = filePath.endsWith('.mp4') ||
-                                      filePath.endsWith('.MOV') ||
-                                      filePath.endsWith('.mov');
-                                  return GestureDetector(
-                                    onTap: () => _toggleMediaSelection(index),
-                                    child: Stack(
+                              flex: 5,
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: Column(
                                       children: [
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 8.0, horizontal: 8.0),
-                                          child: AspectRatio(
-                                            aspectRatio: 1.0,
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(16.0),
-                                              child: isVideo
-                                                  ? _videoControllers[index] !=
-                                                              null &&
-                                                          _videoControllers[
-                                                                  index]!
-                                                              .value
-                                                              .isInitialized
-                                                      ? VideoPlayer(
-                                                          _videoControllers[
-                                                              index]!)
-                                                      : Center(
+                                        if (_mediaPaths.isNotEmpty)
+                                          Expanded(
+                                            flex: 3,
+                                            child: ListView.builder(
+                                              scrollDirection: Axis.horizontal,
+                                              itemCount: _mediaPaths.length,
+                                              itemBuilder: (context, index) {
+                                                final filePath =
+                                                    _mediaPaths[index];
+                                                final isVideo = filePath
+                                                        .endsWith('.mp4') ||
+                                                    filePath.endsWith('.MOV') ||
+                                                    filePath.endsWith('.mov');
+                                                return GestureDetector(
+                                                  onTap: () =>
+                                                      _toggleMediaSelection(
+                                                          index),
+                                                  child: Stack(
+                                                    children: [
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                vertical: 8.0,
+                                                                horizontal:
+                                                                    8.0),
+                                                        child: AspectRatio(
+                                                          aspectRatio: 1.0,
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        16.0),
+                                                            child: isVideo
+                                                                ? _videoControllers[index] !=
+                                                                            null &&
+                                                                        _videoControllers[index]!
+                                                                            .value
+                                                                            .isInitialized
+                                                                    ? VideoPlayer(
+                                                                        _videoControllers[
+                                                                            index]!)
+                                                                    : Center(
+                                                                        child:
+                                                                            CircularProgressIndicator())
+                                                                : Image.file(
+                                                                    File(
+                                                                        filePath),
+                                                                    fit: BoxFit
+                                                                        .cover,
+                                                                  ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (_selectedMediaIndex ==
+                                                          index)
+                                                        Positioned(
+                                                          top: 8,
+                                                          right: 8,
                                                           child:
-                                                              CircularProgressIndicator())
-                                                  : Image.file(
-                                                      File(filePath),
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                              GestureDetector(
+                                                            onTap: () =>
+                                                                _removeMedia(
+                                                                    index),
+                                                            child: CircleAvatar(
+                                                              backgroundColor:
+                                                                  Colors.grey,
+                                                              radius: 16,
+                                                              child: Icon(
+                                                                Icons.close,
+                                                                size: 16,
+                                                                color: Colors
+                                                                    .white,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
-                                        ),
-                                        if (_selectedMediaIndex == index)
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: GestureDetector(
-                                              onTap: () => _removeMedia(index),
-                                              child: CircleAvatar(
-                                                backgroundColor: Colors.grey,
-                                                radius: 16,
-                                                child: Icon(
-                                                  Icons.close,
-                                                  size: 16,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
+                                        if (_filePaths.isNotEmpty)
+                                          Expanded(
+                                            flex: 2,
+                                            child: ListView.builder(
+                                              itemCount: _filePaths.length,
+                                              itemBuilder: (context, index) {
+                                                final filePath =
+                                                    _filePaths[index];
+                                                return ListTile(
+                                                  title: Text(
+                                                    filePath.split('/').last,
+                                                    style: TextStyle(
+                                                      color: Colors.black,
+                                                      fontSize: 18,
+                                                    ),
+                                                  ),
+                                                  trailing: GestureDetector(
+                                                    onTap: () {
+                                                      setState(() {
+                                                        _filePaths
+                                                            .removeAt(index);
+                                                      });
+                                                    },
+                                                    child: Icon(
+                                                      Icons.close,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
                                       ],
                                     ),
-                                  );
-                                },
+                                  ),
+                                  if (_filePaths.isNotEmpty)
+                                    Expanded(
+                                      flex: 2,
+                                      child: ListView.builder(
+                                        itemCount: _filePaths.length,
+                                        itemBuilder: (context, index) {
+                                          final filePath = _filePaths[index];
+                                          return ListTile(
+                                            title: Text(
+                                              filePath.split('/').last,
+                                              style: TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 18,
+                                              ),
+                                            ),
+                                            trailing: GestureDetector(
+                                              onTap: () {
+                                                setState(() {
+                                                  _filePaths.removeAt(index);
+                                                });
+                                              },
+                                              child: Icon(
+                                                Icons.close,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           if (_filePath != null)

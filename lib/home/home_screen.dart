@@ -57,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
           memos = memo.map((item) {
             String memoId = item['memo_id'];
             fetchDetailFutures.add(_fetchMemoDetails(memoId)); // 비동기 작업 리스트에 추가
+            print(DateTime.parse(item['date']));
             return {
               'color': colorMap[item['theme']] ?? Colors.white,
               'isPinned': false,
@@ -105,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           for (var item in memoData) {
             memoItems.add({
+              'memo_id': item['memo_id'],
               'data_id': item['data_id'],
               'format': item['format'],
             });
@@ -156,14 +158,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: Text('공유'),
                 onTap: () {
                   Navigator.pop(context);
-                  // 공유 기능 추가 가능
+                  _showFriendSelectionDialog();
                 },
               ),
               ListTile(
                 leading: Icon(Icons.delete),
                 title: Text('삭제'),
                 onTap: () {
-                  String memoId = memos[index]['memoId'];
+                  String memoId = memos[index]['memo_id'];
                   setState(() {
                     memos.removeAt(index);
                     _deleteMemoFromServer(memoId);
@@ -215,12 +217,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView.builder(
                 shrinkWrap: true,
                 itemCount: friends.length,
-                itemBuilder: (context, index) {
+                itemBuilder: (context, friendIndex) {
                   return ListTile(
-                    title: Text(friends[index]['user_name']!),
+                    title: Text(friends[friendIndex]['user_name']!),
                     onTap: () {
                       Navigator.pop(context);
-                      //_shareMemoWithFriend(friends[index]['user_id']!, );
+                      //_shareMemoWithFriend(friends[index]['user_id']!, index);
                     },
                   );
                 },
@@ -242,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _shareMemoWithFriend(String friendUserId, String memoId) async {
+  Future<void> _shareMemoWithFriend(String friendUserId, int memoId) async {
     final url = Uri.parse('$SERVER_IP/send-memo');
     final response = await http.post(
       url,
@@ -250,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: json.encode({
         'sourceUserId': USER_ID,
         'targetUserId': friendUserId,
-        'memoId': memoId,
+        'memo_id': memoId,
       }),
     );
 
@@ -310,37 +312,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _sortMemos() {
     setState(() {
-      // 메모를 고정 여부 및 타임스탬프에 따라 정렬
+      // 1. memos 리스트를 timestamp를 기준으로 내림차순으로 정렬
       memos.sort((a, b) {
         if (a['isPinned'] && !b['isPinned']) {
           return -1;
         } else if (!a['isPinned'] && b['isPinned']) {
           return 1;
         } else {
-          return a['timestamp'].compareTo(b['timestamp']); // 최신순이 아니라 작성순으로 정렬
+          return b['timestamp'].compareTo(a['timestamp']);
         }
       });
 
-      // 정렬된 memos 리스트의 인덱스에 따라 originalIndex를 0부터 설정
-      for (int i = 0; i < memos.length; i++) {
-        memos[i]['originalIndex'] = i.toString();
-      }
-
-      // datas 리스트도 새로운 originalIndex에 맞춰 업데이트
-      for (var data in datas) {
-        // data['originalIndex']를 새로운 인덱스로 업데이트
-        int oldIndex = int.parse(data['originalIndex']);
-        data['originalIndex'] = memos
-            .indexWhere((memo) => memo['originalIndex'] == oldIndex.toString())
-            .toString();
-      }
-
-      // 업데이트된 originalIndex에 따라 datas를 다시 정렬
+      // 2. 정렬된 memos 리스트에 따라 datas 리스트를 재정렬
       datas.sort((a, b) {
-        int indexA = int.parse(a['originalIndex']);
-        int indexB = int.parse(b['originalIndex']);
+        int indexA = memos.indexWhere(
+            (memo) => memo['memo_id'] == a['data'].first['memo_id']);
+        int indexB = memos.indexWhere(
+            (memo) => memo['memo_id'] == b['data'].first['memo_id']);
+
+        // indexA와 indexB를 비교하여 datas 리스트를 memos 리스트의 순서에 맞게 정렬
         return indexA.compareTo(indexB);
       });
+
+      // 3. 정렬된 memos 리스트의 originalIndex를 0부터 다시 매깁니다.
+      for (int i = 0; i < memos.length; i++) {
+        memos[i]['originalIndex'] = i;
+      }
+
+      // 4. datas 리스트의 originalIndex도 memos 리스트와 일치하도록 업데이트합니다.
+      for (var data in datas) {
+        int index = memos.indexWhere(
+            (memo) => memo['memo_id'] == data['data'].first['memo_id']);
+        data['originalIndex'] = index.toString();
+      }
     });
   }
 
@@ -368,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (context) => WriteMemoScreen(
           initialColor: memos[index]['color'],
-          initialMemoId: memos[index]['memoId'],
+          initialMemoId: memos[index]['memo_id'],
           initialImageData: imageData,
         ),
       ),
@@ -691,17 +695,20 @@ class _HomeScreenState extends State<HomeScreen> {
             context,
             MaterialPageRoute(builder: (context) => WriteMemoScreen()),
           );
-          if (result != null && result['text'].isNotEmpty) {
+          if (result != null &&
+              result['text'] != null &&
+              result['text'].isNotEmpty) {
             setState(() {
+              // 모든 필드가 null이 아님을 보장
               result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
-              result['timestamp'] = DateTime.now(); // 새로운 메모의 작성 시간 설정
-              memos.add(result);
+              memos.add(result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
             });
 
             // 작성 시간을 기준으로 내림차순 정렬
-            //memos.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
+            memos.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
             _sortMemos();
           }
+
           _fetchMemos(); // 서버에서 최신 데이터 불러오기
           _sortMemos();
         },
