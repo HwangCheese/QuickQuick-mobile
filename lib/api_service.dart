@@ -43,18 +43,18 @@ class ApiService {
             final entities = responseData['entities'] as List<dynamic>;
 
             if (entities.isNotEmpty) {
-              final summaries = entities.map((e) {
-                final entityName =
-                    e['entityId'] ?? e['entityEnglishId'] ?? 'Unknown Entity';
-                final matchedText = e['matchedText'] ?? 'No matched text';
-                final confidence =
-                    e['confidenceScore']?.toStringAsFixed(2) ?? 'N/A';
+              // 엔티티 이름 추출
+              final entityNames = entities.map((e) {
+                return e['entityId'] ??
+                    e['entityEnglishId'] ??
+                    'Unknown Entity';
+              }).toList();
 
-                return '엔티티: $entityName\nMatched Text: "$matchedText"\n신뢰도: $confidence\n';
-              }).join('\n');
+              // 문장 생성
+              final sentence =
+                  '이 텍스트에서 언급된 주요 엔티티는 ${entityNames.join(', ')}입니다.';
 
-              final summary = '텍스트에서 추출된 주요 엔티티:\n\n$summaries';
-              return summary;
+              return sentence;
             } else {
               return '텍스트에서 유의미한 엔티티를 찾을 수 없습니다.';
             }

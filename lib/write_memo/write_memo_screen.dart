@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -29,6 +30,7 @@ class WriteMemoScreen extends StatefulWidget {
 
 class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final TextEditingController _controller = TextEditingController();
+  final _textController = TextEditingController(); //번역에서 사용
   Color _backgroundColor = Colors.white;
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _picker = ImagePicker();
@@ -45,6 +47,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String _summary = '';
   String _originalText = '';
   bool _isLoading = true; // 로딩 상태를 추가
+  String _translatedText = '';
+  String _selectedLanguage = 'ko';
+  final String _textToProcess = '';
 
   Map<String, Color> colorMap = {
     'white': Colors.white,
@@ -57,11 +62,46 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     'grey': Colors.grey[300]!,
   };
 
+  final List<String> _languages = [
+    'en', // 영어
+    'es', // 스페인어
+    'fr', // 프랑스어
+    'de', // 독일어
+    'ja', // 일본어
+    'ko', // 한국어
+  ];
+
+  String _getLanguageName(String code) {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'es':
+        return 'Spanish';
+      case 'fr':
+        return 'French';
+      case 'de':
+        return 'German';
+      case 'ja':
+        return 'Japanese';
+      case 'ko':
+        return 'Korean';
+      default:
+        return 'Unknown';
+    }
+  }
+
   String getColorName(Color color) {
     return colorMap.entries
         .firstWhere((entry) => entry.value == color,
             orElse: () => MapEntry('white', Colors.white))
         .key;
+  }
+
+  Future<void> _checkPermissions() async {
+    var status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      await Permission.microphone.request();
+    }
   }
 
   @override
@@ -70,6 +110,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _initializeMemoData();
     _initRecorder();
     _videoControllers = [];
+    _checkPermissions();
   }
 
   Future<void> _initializeMemoData() async {
@@ -158,31 +199,83 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  Future<String> getSummary(String text) async {
+  Future<void> _getSummary() async {
+    final response = await http.post(
+      Uri.parse('$SERVER_IP/summarize'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'text': _controller.text}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      setState(() {
+        _summary = data['summary'];
+      });
+    } else {
+      setState(() {
+        _summary = '요약을 가져오는 중 오류 발생.';
+      });
+    }
+  }
+
+  Future<String> translateText(String text, String targetLanguage) async {
+    final url =
+        'https://translation.googleapis.com/language/translate/v2?key=$apiKey';
+
     try {
       final response = await http.post(
-        Uri.parse('http://$SERVER_IP/summary'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{
-          'text': text,
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'q': text,
+          'target': targetLanguage,
         }),
       );
 
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}'); // 확인용
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data.containsKey('summary')) {
-          return data['summary'] as String;
+        final data = jsonDecode(response.body);
+        final translations = data['data']['translations'];
+        if (translations != null && translations.isNotEmpty) {
+          return translations[0]['translatedText'];
         } else {
-          throw Exception('API 응답에서 요약을 찾을 수 없습니다.');
+          return 'No translation available';
         }
       } else {
-        throw Exception('API 호출 실패: ${response.statusCode}');
+        throw Exception('Failed to translate text');
       }
     } catch (e) {
-      print('요약 요청 실패: $e');
-      return '요약을 가져오는 데 실패했습니다.';
+      print('Error occurred: $e');
+      throw Exception('Failed to translate text');
+    }
+  }
+
+  Future<void> _translate() async {
+    final textToTranslate = _controller.text; // 현재 사용 중인 컨트롤러
+
+    // 만약 메모 내용을 번역하려면 _controller.text를 사용해야 합니다.
+    // final textToTranslate = _controller.text;
+
+    if (textToTranslate.isEmpty) {
+      setState(() {
+        _translatedText = 'No text to translate';
+      });
+      return;
+    }
+
+    try {
+      final translatedText =
+          await translateText(textToTranslate, _selectedLanguage);
+      setState(() {
+        _translatedText = translatedText;
+      });
+    } catch (e) {
+      print('Error occurred: $e');
+      setState(() {
+        _translatedText = 'Failed to translate text';
+      });
     }
   }
 
@@ -205,11 +298,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
     _recorder.closeRecorder();
-    for (var controller in _videoControllers) {
+    _videoControllers.forEach((controller) {
       controller?.dispose();
-    }
+    });
     super.dispose();
   }
 
@@ -432,23 +524,46 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  // 녹음 시작
   Future<void> _startRecording() async {
-    Directory appDocDir = await getApplicationDocumentsDirectory();
-    String filePath =
-        '${appDocDir.path}/memo_audio_${DateTime.now().millisecondsSinceEpoch}.aac';
+    var status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        // 권한이 부여되지 않았으므로, 녹음을 시작하지 않음.
+        print("Microphone permission not granted");
+        return;
+      }
+    }
 
-    await _recorder.startRecorder(toFile: filePath, codec: Codec.aacADTS);
-    setState(() {
-      _isRecording = true;
-      _audioPath = filePath;
-    });
+    // 권한이 부여되었으므로, 녹음을 시작함.
+    try {
+      final Directory tempDir = await getTemporaryDirectory();
+      final String tempPath = tempDir.path;
+      _filePath = '$tempPath/recording.aac'; // 저장할 파일 경로 설정
+
+      await _recorder.startRecorder(toFile: 'recording.aac');
+      setState(() {
+        _isRecording = true;
+      });
+    } catch (e) {
+      print("Error starting recorder: $e");
+    }
   }
 
+  // 녹음 중지
   Future<void> _stopRecording() async {
-    await _recorder.stopRecorder();
-    setState(() {
-      _isRecording = false;
-    });
+    if (_isRecording) {
+      try {
+        await _recorder.stopRecorder();
+        setState(() {
+          _isRecording = false;
+        });
+        print("Recording stopped and saved at $_filePath");
+      } catch (e) {
+        print("Error stopping recorder: $e");
+      }
+    }
   }
 
   Future<void> _pickFile() async {
@@ -650,11 +765,37 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       : Icon(CupertinoIcons.mic),
                   onPressed: _isRecording ? _stopRecording : _startRecording,
                 ),
+                if (_filePath != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                  ),
                 SizedBox(width: 16.0),
                 IconButton(
                   iconSize: 30.0,
                   icon: const Icon(Icons.edit_note),
-                  onPressed: () {},
+                  onPressed: _getSummary,
+                ),
+                SizedBox(width: 16.0),
+                DropdownButton<String>(
+                  value: _selectedLanguage,
+                  items: _languages.map((String language) {
+                    return DropdownMenuItem<String>(
+                      value: language,
+                      child: Text(_getLanguageName(language)),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedLanguage = newValue!;
+                    });
+                  },
+                ),
+                SizedBox(width: 16.0),
+                IconButton(
+                  iconSize: 30.0,
+                  icon: const Icon(Icons.translate),
+                  onPressed: _translate,
+                  tooltip: 'Translate Text',
                 ),
                 SizedBox(width: 16.0),
                 IconButton(
@@ -697,172 +838,82 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           if (_mediaPaths.isNotEmpty)
                             Expanded(
                               flex: 5,
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    flex: 5,
-                                    child: Column(
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _mediaPaths.length,
+                                itemBuilder: (context, index) {
+                                  final filePath = _mediaPaths[index];
+                                  final isVideo = filePath.endsWith('.mp4') ||
+                                      filePath.endsWith('.MOV') ||
+                                      filePath.endsWith('.mov');
+                                  return GestureDetector(
+                                    onTap: () => _toggleMediaSelection(index),
+                                    child: Stack(
                                       children: [
-                                        if (_mediaPaths.isNotEmpty)
-                                          Expanded(
-                                            flex: 3,
-                                            child: ListView.builder(
-                                              scrollDirection: Axis.horizontal,
-                                              itemCount: _mediaPaths.length,
-                                              itemBuilder: (context, index) {
-                                                final filePath =
-                                                    _mediaPaths[index];
-                                                final isVideo = filePath
-                                                        .endsWith('.mp4') ||
-                                                    filePath.endsWith('.MOV') ||
-                                                    filePath.endsWith('.mov');
-                                                return GestureDetector(
-                                                  onTap: () =>
-                                                      _toggleMediaSelection(
-                                                          index),
-                                                  child: Stack(
-                                                    children: [
-                                                      Padding(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                vertical: 8.0,
-                                                                horizontal:
-                                                                    8.0),
-                                                        child: AspectRatio(
-                                                          aspectRatio: 1.0,
-                                                          child: ClipRRect(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        16.0),
-                                                            child: isVideo
-                                                                ? _videoControllers[index] !=
-                                                                            null &&
-                                                                        _videoControllers[index]!
-                                                                            .value
-                                                                            .isInitialized
-                                                                    ? VideoPlayer(
-                                                                        _videoControllers[
-                                                                            index]!)
-                                                                    : Center(
-                                                                        child:
-                                                                            CircularProgressIndicator())
-                                                                : Image.file(
-                                                                    File(
-                                                                        filePath),
-                                                                    fit: BoxFit
-                                                                        .cover,
-                                                                  ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      if (_selectedMediaIndex ==
-                                                          index)
-                                                        Positioned(
-                                                          top: 8,
-                                                          right: 8,
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 8.0, horizontal: 8.0),
+                                          child: AspectRatio(
+                                            aspectRatio: 1.0,
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(16.0),
+                                              child: isVideo
+                                                  ? _videoControllers[index] !=
+                                                              null &&
+                                                          _videoControllers[
+                                                                  index]!
+                                                              .value
+                                                              .isInitialized
+                                                      ? VideoPlayer(
+                                                          _videoControllers[
+                                                              index]!)
+                                                      : Center(
                                                           child:
-                                                              GestureDetector(
-                                                            onTap: () =>
-                                                                _removeMedia(
-                                                                    index),
-                                                            child: CircleAvatar(
-                                                              backgroundColor:
-                                                                  Colors.grey,
-                                                              radius: 16,
-                                                              child: Icon(
-                                                                Icons.close,
-                                                                size: 16,
-                                                                color: Colors
-                                                                    .white,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
+                                                              CircularProgressIndicator(),
+                                                        )
+                                                  : Image.file(
+                                                      File(filePath),
+                                                      fit: BoxFit.cover,
+                                                    ),
                                             ),
                                           ),
-                                        if (_filePaths.isNotEmpty)
-                                          Expanded(
-                                            flex: 2,
-                                            child: ListView.builder(
-                                              itemCount: _filePaths.length,
-                                              itemBuilder: (context, index) {
-                                                final filePath =
-                                                    _filePaths[index];
-                                                return ListTile(
-                                                  title: Text(
-                                                    filePath.split('/').last,
-                                                    style: TextStyle(
-                                                      color: Colors.black,
-                                                      fontSize: 18,
-                                                    ),
-                                                  ),
-                                                  trailing: GestureDetector(
-                                                    onTap: () {
-                                                      setState(() {
-                                                        _filePaths
-                                                            .removeAt(index);
-                                                      });
-                                                    },
-                                                    child: Icon(
-                                                      Icons.close,
-                                                      color: Colors.grey,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
+                                        ),
+                                        if (_selectedMediaIndex == index)
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: GestureDetector(
+                                              onTap: () => _removeMedia(index),
+                                              child: CircleAvatar(
+                                                backgroundColor: Colors.grey,
+                                                radius: 16,
+                                                child: Icon(
+                                                  Icons.close,
+                                                  size: 16,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                       ],
                                     ),
-                                  ),
-                                  if (_filePaths.isNotEmpty)
-                                    Expanded(
-                                      flex: 2,
-                                      child: ListView.builder(
-                                        itemCount: _filePaths.length,
-                                        itemBuilder: (context, index) {
-                                          final filePath = _filePaths[index];
-                                          return ListTile(
-                                            title: Text(
-                                              filePath.split('/').last,
-                                              style: TextStyle(
-                                                color: Colors.black,
-                                                fontSize: 18,
-                                              ),
-                                            ),
-                                            trailing: GestureDetector(
-                                              onTap: () {
-                                                setState(() {
-                                                  _filePaths.removeAt(index);
-                                                });
-                                              },
-                                              child: Icon(
-                                                Icons.close,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                ],
+                                  );
+                                },
                               ),
                             ),
                           if (_filePath != null)
-                            Container(
-                              color: Colors.white,
-                              padding: EdgeInsets.all(8.0),
-                              child: Text(
-                                _filePath!.split('/').last,
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 18,
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Container(
+                                color: Colors.white,
+                                padding: EdgeInsets.all(8.0),
+                                child: Text(
+                                  _filePath!.split('/').last,
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 18,
+                                  ),
                                 ),
                               ),
                             ),
@@ -882,14 +933,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   fontSize: 16.0,
                                   color: Colors.black,
                                 ),
-                                onChanged: (value) {},
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 20.0),
+                    if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
+                      SizedBox(height: 20.0),
                     if (_summary.isNotEmpty)
                       Container(
                         width: screenWidth * 0.9,
@@ -904,6 +955,31 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                               offset: Offset(0, 2),
                             ),
                           ],
+                        ),
+                        child: Text(
+                          _summary,
+                          style: TextStyle(fontSize: 16.0, color: Colors.black),
+                        ),
+                      ),
+                    if (_translatedText.isNotEmpty) SizedBox(height: 20.0),
+                    if (_translatedText.isNotEmpty)
+                      Container(
+                        width: screenWidth * 0.9,
+                        padding: EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8.0,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _translatedText,
+                          style: TextStyle(fontSize: 16.0, color: Colors.black),
                         ),
                       ),
                     SizedBox(height: 20.0),

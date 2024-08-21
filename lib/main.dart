@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sticker_memo/screens/login/login_screen.dart';
-import 'package:sticker_memo/screens/home/home_screen.dart';
 import 'globals.dart';
+import 'home/home_screen.dart';
+import 'login/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
