@@ -3,4 +3,4 @@
 String USER_ID = "";
 String USER_NAME = "";
 const String SERVER_IP = 'http://223.194.129.146:3000';
-const String apiKey = '';
+const String apiKey = 'AIzaSyBSV2SSGii3W13I4s7-Y5r-rHBZev1lt6Q';
