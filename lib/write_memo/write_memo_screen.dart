@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
@@ -52,6 +53,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String _selectedLanguage = 'ko';
   final String _textToProcess = '';
 
+  String? _initialText;
+  Color? _initialBackgroundColor;
+  List<String> _initialMediaPaths = [];
+
   Map<String, Color> colorMap = {
     'white': Colors.white,
     'pink': Colors.pink[100]!,
@@ -92,10 +97,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   String getColorName(Color color) {
-    return colorMap.entries
+    // colorMap의 value 중 일치하는 Color가 있는지 확인
+    String colorKey = colorMap.entries
         .firstWhere((entry) => entry.value == color,
             orElse: () => MapEntry('white', Colors.white))
         .key;
+    return colorKey;
   }
 
   Future<void> _checkPermissions() async {
@@ -117,7 +124,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Future<void> _initializeMemoData() async {
     if (widget.initialMemoId != null) {
       await _fetchMemoDetails(widget.initialMemoId!);
-      _deleteMemoFromServer(widget.initialMemoId!);
+      // 초기 상태 저장
+      _initialText = _controller.text;
+      _initialBackgroundColor = _backgroundColor;
+      _initialMediaPaths = List.from(_mediaPaths);
     } else {
       if (widget.initialColor != null) {
         _backgroundColor = widget.initialColor!;
@@ -146,13 +156,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             setState(() {
               _controller.text = text ?? '';
             });
-          } else {
-            final image = await _getImage(item['data_id']);
-            if (image != null) {
+          } else if (item['format'] == 'MOV') {
+            final videoPath = await _getVideo(item['data_id']);
+            if (videoPath != null) {
               setState(() {
-                _fetchedImages.add(image);
+                _mediaPaths.add(videoPath);
+                _initializeVideoController(videoPath, _mediaPaths.length - 1);
                 _isMediaSelected = true;
               });
+            } else {
+              final image = await _getImage(item['data_id']);
+              if (image != null) {
+                setState(() {
+                  _fetchedImages.add(image);
+                  _isMediaSelected = true;
+                });
+              }
             }
           }
         }
@@ -165,6 +184,28 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       setState(() {
         _isLoading = false; // 데이터 로드가 끝난 후 로딩 상태 해제
       });
+    }
+  }
+
+  Future<String?> _getVideo(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // 서버로부터 받은 비디오 파일을 로컬에 저장한 후 경로를 반환
+        final directory = await getTemporaryDirectory();
+        final videoPath =
+            '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.mp4';
+        final videoFile = File(videoPath);
+        await videoFile.writeAsBytes(response.bodyBytes);
+        return videoPath;
+      } else {
+        print('Failed to load video: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('비디오 불러오기 실패: $e');
+      return null;
     }
   }
 
@@ -256,9 +297,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Future<void> _translate() async {
     final textToTranslate = _controller.text; // 현재 사용 중인 컨트롤러
 
-    // 만약 메모 내용을 번역하려면 _controller.text를 사용해야 합니다.
-    // final textToTranslate = _controller.text;
-
     if (textToTranslate.isEmpty) {
       setState(() {
         _translatedText = 'No text to translate';
@@ -322,14 +360,31 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     return await imageFile.writeAsBytes(imageData);
   }
 
+  bool _hasMemoChanged() {
+    if (_controller.text != _initialText) return true;
+    if (_backgroundColor != _initialBackgroundColor) return true;
+    if (_mediaPaths.length != _initialMediaPaths.length) return true;
+    for (int i = 0; i < _mediaPaths.length; i++) {
+      if (_mediaPaths[i] != _initialMediaPaths[i]) return true;
+    }
+    return false;
+  }
+
   Future<void> _saveMemoToServer() async {
-    widget.initialMemoId = _generateRandomId();
+    if (!_hasMemoChanged()) {
+      print('메모가 변경되지 않았습니다. 저장을 건너뜁니다.');
+      return;
+    }
+
+    widget.initialMemoId ??= _generateRandomId();
+
     var url = Uri.parse('$SERVER_IP/memo');
     var request = http.MultipartRequest('POST', url);
 
     request.fields['userId'] = USER_ID;
     request.fields['isOpen'] = '1'; // Assuming the memo is public
-    request.fields['theme'] = getColorName(_backgroundColor);
+    request.fields['theme'] =
+        getColorName(_backgroundColor); // Color를 key로 변환하여 저장
     request.fields['posX'] = '100'; // Example position and size
     request.fields['posY'] = '100';
     request.fields['width'] = '400';
@@ -358,9 +413,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
     }
 
+    if (widget.initialMemoId != null && _hasMemoChanged()) {
+      await _deleteMemoFromServer(widget.initialMemoId!);
+    }
+
     var response = await request.send();
     if (response.statusCode == 201) {
       print('메모 저장 성공');
+      // 초기 상태를 현재 상태로 업데이트
+      _initialText = _controller.text;
+      _initialBackgroundColor = _backgroundColor;
+      _initialMediaPaths = List.from(_mediaPaths);
     } else {
       print('메모 저장 실패: ${response.statusCode}');
     }
@@ -509,17 +572,24 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   void _initializeVideoController(String videoPath, int index) {
-    final controller = VideoPlayerController.file(File(videoPath));
-    controller.initialize().then((_) {
-      setState(() {
-        if (_videoControllers.length <= index) {
-          _videoControllers.add(controller);
-        } else {
-          _videoControllers[index] = controller;
-        }
-        _videoControllers[index]?.play(); // Auto-play the video
+    try {
+      final controller = VideoPlayerController.file(File(videoPath));
+
+      controller.initialize().then((_) {
+        setState(() {
+          if (_videoControllers.length <= index) {
+            _videoControllers.add(controller);
+          } else {
+            _videoControllers[index] = controller;
+          }
+          _videoControllers[index]?.play(); // Auto-play the video
+        });
+      }).catchError((error) {
+        print("Video initialization failed: $error");
       });
-    });
+    } catch (e) {
+      print("Error initializing video: $e");
+    }
   }
 
   // 녹음 시작
@@ -539,7 +609,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = tempDir.path;
       _filePath =
-          '$tempPath/recording_${DateTime.now().millisecondsSinceEpoch}.aac'; // 저장할 파일 경로 설정
+          '$tempPath/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
 
       await _recorder.startRecorder(toFile: _filePath); // 경로를 사용하여 녹음 시작
       setState(() {
@@ -685,7 +755,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     setState(() {
       if (_selectedMediaIndex == index) {
         _selectedMediaIndex = null; // 선택된 미디어가 다시 터치되면 선택 해제
-        if (_videoControllers[index] != null &&
+        if (index < _videoControllers.length &&
+            _videoControllers[index] != null &&
             _videoControllers[index]!.value.isInitialized) {
           if (_videoControllers[index]!.value.isPlaying) {
             _videoControllers[index]!.pause();
@@ -696,15 +767,20 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         }
       } else {
         _selectedMediaIndex = index; // 해당 미디어를 선택
-        if (_mediaPaths[index].endsWith('.mp4') ||
-            _mediaPaths[index].endsWith('.MOV') ||
-            _mediaPaths[index].endsWith('.mov')) {
+        if (index < _mediaPaths.length &&
+            (_mediaPaths[index].endsWith('.mp4') ||
+                _mediaPaths[index].endsWith('.MOV') ||
+                _mediaPaths[index].endsWith('.mov'))) {
+          if (index >= _videoControllers.length) {
+            // _videoControllers 리스트 크기보다 큰 인덱스가 필요할 경우, null로 채워넣기
+            for (int i = _videoControllers.length; i <= index; i++) {
+              _videoControllers.add(null);
+            }
+          }
           if (_videoControllers[index] == null) {
             _initializeVideoController(_mediaPaths[index], index);
-          } else {
-            if (!_videoControllers[index]!.value.isPlaying) {
-              _videoControllers[index]!.play();
-            }
+          } else if (!_videoControllers[index]!.value.isPlaying) {
+            _videoControllers[index]!.play();
           }
         }
       }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
+import 'dart:io'; // File 클래스를 사용하기 위해 추가
 import '../calendar/calendar_screen.dart';
 import '../friends_list/friends_list_screen.dart';
 import '../write_memo/write_memo_screen.dart';
@@ -52,12 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final List<dynamic> memo = json.decode(response.body);
         List<Future<void>> fetchDetailFutures = [];
-        print(response.body);
         setState(() {
           memos = memo.map((item) {
             String memoId = item['memo_id'];
             fetchDetailFutures.add(_fetchMemoDetails(memoId)); // 비동기 작업 리스트에 추가
-            print(DateTime.parse(item['date']));
             return {
               'color': colorMap[item['theme']] ?? Colors.white,
               'isPinned': false,
@@ -67,12 +66,11 @@ class _HomeScreenState extends State<HomeScreen> {
           }).toList();
         });
 
+        print(memos);
         await Future.wait(fetchDetailFutures); // 모든 비동기 작업이 완료될 때까지 기다림
 
         // 작성 시간을 기준으로 내림차순 정렬
         memos.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
-
-        print(datas); // 모든 작업 완료 후 출력
       } else {
         print('Failed to load memos: ${response.statusCode}');
       }
@@ -89,7 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final List<dynamic> memoData = json.decode(response.body);
         int originalIndex = -1;
 
-        // memos 리스트에서 memo_id에 해당하는 메모를 찾아 originalIndex를 구함
         for (var item in memos) {
           if (item['memo_id'] == memoId) {
             originalIndex = memos.indexOf(item);
@@ -98,7 +95,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         if (originalIndex != -1) {
-          // 데이터를 추가하기 전에 해당 메모에 대한 데이터를 초기화
           datas.removeWhere(
               (data) => data['originalIndex'] == originalIndex.toString());
 
@@ -124,6 +120,83 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('Failed to load memo datas: $e');
+    }
+  }
+
+  Future<Widget> _getDataWidget(String dataId, String format, int index) async {
+    if (format == 'txt') {
+      return FutureBuilder<String?>(
+        future: _getData(dataId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasData) {
+              return Text(
+                snapshot.data!,
+                style: TextStyle(fontSize: 16.0),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              );
+            } else {
+              return Text('데이터를 불러올 수 없습니다.');
+            }
+          } else {
+            return CircularProgressIndicator();
+          }
+        },
+      );
+    } else if (format == 'jpg' || format == 'png' || format == 'jpeg') {
+      return FutureBuilder<Uint8List?>(
+        future: _getImage(dataId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            if (snapshot.hasData) {
+              return AspectRatio(
+                aspectRatio: 1,
+                child: Image.memory(snapshot.data!, fit: BoxFit.cover),
+              );
+            } else {
+              return Text('이미지를 불러올 수 없습니다.');
+            }
+          } else {
+            return CircularProgressIndicator();
+          }
+        },
+      );
+    } else {
+      return Text('지원하지 않는 형식입니다.');
+    }
+  }
+
+  Future<String?> _getData(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return utf8.decode(response.bodyBytes);
+      } else {
+        print('파일 불러오기 실패: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('파일 불러오기 실패!!: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List?> _getImage(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        imageData = response.bodyBytes;
+        return imageData;
+      } else {
+        print('Failed to load image: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('이미지 불러오기 실패: $e');
+      return null;
     }
   }
 
@@ -312,7 +385,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _sortMemos() {
     setState(() {
-      // 1. memos 리스트를 timestamp를 기준으로 내림차순으로 정렬
       memos.sort((a, b) {
         if (a['isPinned'] && !b['isPinned']) {
           return -1;
@@ -323,23 +395,18 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
 
-      // 2. 정렬된 memos 리스트에 따라 datas 리스트를 재정렬
       datas.sort((a, b) {
         int indexA = memos.indexWhere(
             (memo) => memo['memo_id'] == a['data'].first['memo_id']);
         int indexB = memos.indexWhere(
             (memo) => memo['memo_id'] == b['data'].first['memo_id']);
-
-        // indexA와 indexB를 비교하여 datas 리스트를 memos 리스트의 순서에 맞게 정렬
         return indexA.compareTo(indexB);
       });
 
-      // 3. 정렬된 memos 리스트의 originalIndex를 0부터 다시 매깁니다.
       for (int i = 0; i < memos.length; i++) {
         memos[i]['originalIndex'] = i;
       }
 
-      // 4. datas 리스트의 originalIndex도 memos 리스트와 일치하도록 업데이트합니다.
       for (var data in datas) {
         int index = memos.indexWhere(
             (memo) => memo['memo_id'] == data['data'].first['memo_id']);
@@ -424,40 +491,6 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedMemos.clear();
       isSelectionMode = false;
     });
-  }
-
-  Future<Uint8List?> _getImage(String dataId) async {
-    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        imageData = response.bodyBytes;
-        return imageData;
-      } else {
-        print('Failed to load image: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('이미지 불러오기 실패: $e');
-      return null;
-    }
-  }
-
-  Future<String?> _getData(String dataId) async {
-    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
-    print(url);
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        return utf8.decode(response.bodyBytes);
-      } else {
-        print('파일 불러오기 실패: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('파일 불러오기 실패!!: $e');
-      return null;
-    }
   }
 
   @override
@@ -559,7 +592,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemBuilder: (context, index) {
                     bool isSelected = selectedMemos.contains(index);
 
-                    // 메모의 데이터 불러오기
                     List<Map<String, dynamic>> memoDatas = datas
                         .where(
                             (data) => data['originalIndex'] == index.toString())
@@ -586,54 +618,23 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // 메모에 포함된 데이터들을 출력
                                   for (var data in memoDatas) ...[
-                                    if (data['format'] == 'txt')
-                                      FutureBuilder<String?>(
-                                        future: _getData(data['data_id']),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState ==
-                                              ConnectionState.done) {
-                                            if (snapshot.hasData) {
-                                              return Text(
-                                                snapshot.data!,
-                                                style: TextStyle(
-                                                  fontSize: 16.0,
-                                                ),
-                                                maxLines: 3,
-                                                overflow: TextOverflow.ellipsis,
-                                              );
-                                            } else {
-                                              return Text('데이터를 불러올 수 없습니다.');
-                                            }
+                                    FutureBuilder<Widget>(
+                                      future: _getDataWidget(data['data_id'],
+                                          data['format'], index),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.done) {
+                                          if (snapshot.hasData) {
+                                            return snapshot.data!;
                                           } else {
-                                            return CircularProgressIndicator();
+                                            return Text('데이터를 불러올 수 없습니다.');
                                           }
-                                        },
-                                      ),
-                                    if (data['format'] != 'txt' &&
-                                        data['format'] != null)
-                                      FutureBuilder<Uint8List?>(
-                                        future: _getImage(data['data_id']),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState ==
-                                              ConnectionState.done) {
-                                            if (snapshot.hasData) {
-                                              return AspectRatio(
-                                                aspectRatio: 1,
-                                                child: Image.memory(
-                                                  snapshot.data!,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              );
-                                            } else {
-                                              return Text('이미지를 불러올 수 없습니다.');
-                                            }
-                                          } else {
-                                            return CircularProgressIndicator();
-                                          }
-                                        },
-                                      ),
+                                        } else {
+                                          return CircularProgressIndicator();
+                                        }
+                                      },
+                                    ),
                                   ],
                                 ],
                               ),
@@ -701,12 +702,10 @@ class _HomeScreenState extends State<HomeScreen> {
               result['text'] != null &&
               result['text'].isNotEmpty) {
             setState(() {
-              // 모든 필드가 null이 아님을 보장
               result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
               memos.add(result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
             });
 
-            // 작성 시간을 기준으로 내림차순 정렬
             memos.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
             _sortMemos();
           }
