@@ -29,10 +29,12 @@ class _LoginState extends State<Login> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final userId = prefs.getString('userId');
+    final userName = prefs.getString('userName');
 
-    if (token != null && userId != null) {
+    if (token != null && userId != null && userName != null) {
       // 사용자 ID와 토큰을 전역 변수 또는 상태로 설정
       USER_ID = userId;
+      USER_NAME = userName;
       // 추가로 필요한 초기화 작업을 수행합니다.
 
       // 바로 홈 화면으로 이동
@@ -118,6 +120,7 @@ class _LoginState extends State<Login> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', token);
           await prefs.setString('userId', userId);
+          await prefs.setString('userName', USER_NAME);
 
           // 홈 화면으로 이동
           Navigator.pushReplacement(

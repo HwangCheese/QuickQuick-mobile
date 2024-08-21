@@ -11,11 +11,13 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('token');
   final userId = prefs.getString('userId');
+  final userName = prefs.getString('userName');
 
   Widget initialScreen;
 
-  if (token != null && userId != null) {
+  if (token != null && userId != null && userName != null) {
     USER_ID = userId;
+    USER_NAME = userName;
     initialScreen = HomeScreen();
   } else {
     initialScreen = Login();

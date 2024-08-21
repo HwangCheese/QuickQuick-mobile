@@ -495,6 +495,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('token');
                 await prefs.remove('userId');
+                await prefs.remove('userName');
 
                 Navigator.pushReplacement(
                   context,
