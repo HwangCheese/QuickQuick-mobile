@@ -493,7 +493,8 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.logout),
               onPressed: () async {
                 final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('isLoggedIn'); // 로그인 상태 제거
+                await prefs.remove('token');
+                await prefs.remove('userId');
 
                 Navigator.pushReplacement(
                   context,

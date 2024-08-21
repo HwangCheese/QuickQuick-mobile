@@ -1,19 +1,12 @@
 import 'dart:convert'; // jsonEncode를 사용하기 위해 import
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../globals.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:http/http.dart' as http;
 
 import '../home/home_screen.dart';
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Login(),
-    );
-  }
-}
 
 class Login extends StatefulWidget {
   @override
@@ -25,6 +18,30 @@ class _LoginState extends State<Login> {
   QRViewController? qrViewController;
   String? scanResult; // QR 코드에서 읽은 데이터를 저장할 변수
   bool showLoginButton = false; // 로그인 버튼을 보여줄지 여부를 결정하는 변수
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final userId = prefs.getString('userId');
+
+    if (token != null && userId != null) {
+      // 사용자 ID와 토큰을 전역 변수 또는 상태로 설정
+      USER_ID = userId;
+      // 추가로 필요한 초기화 작업을 수행합니다.
+
+      // 바로 홈 화면으로 이동
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,29 +92,32 @@ class _LoginState extends State<Login> {
       return;
     }
 
-    // QR 코드에서 받은 데이터를 바로 사용 (이제 토큰만 포함됨)
     final String token = scanResult!;
 
     try {
       final response = await http.post(
-        Uri.parse('$SERVER_IP/login-mobile'), // 로그인 요청 URL
+        Uri.parse('$SERVER_IP/login-mobile'),
         headers: {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'token': token, // 토큰만 전달합니다.
+          'token': token,
         }),
       );
 
       if (response.statusCode == 200) {
         print('로그인 성공: ${token}');
 
-        // 로그인 성공 후 사용자 ID를 가져오는 함수 호출
         final String? userId = await _fetchUserId(token);
 
         if (userId != null) {
           print('사용자 ID: $userId');
           USER_ID = userId;
+
+          // 로그인 정보 캐시에 저장
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', token);
+          await prefs.setString('userId', userId);
 
           // 홈 화면으로 이동
           Navigator.pushReplacement(
