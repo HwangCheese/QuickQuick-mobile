@@ -30,7 +30,7 @@ class WriteMemoScreen extends StatefulWidget {
 
 class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final TextEditingController _controller = TextEditingController();
-  final _textController = TextEditingController(); //번역에서 사용
+  final _textController = TextEditingController(); // 번역에서 사용
   Color _backgroundColor = Colors.white;
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _picker = ImagePicker();
@@ -43,6 +43,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   bool _isMediaSelected = false;
   Uint8List? _imageData;
   int? _selectedMediaIndex;
+  List<Uint8List> _fetchedImages = [];
   List<VideoPlayerController?> _videoControllers = [];
   String _summary = '';
   String _originalText = '';
@@ -123,7 +124,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       }
       if (widget.initialImageData != null) {
         _isMediaSelected = true;
-        _imageData = widget.initialImageData;
+        _fetchedImages.add(widget.initialImageData!);
       }
     }
 
@@ -149,7 +150,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             final image = await _getImage(item['data_id']);
             if (image != null) {
               setState(() {
-                _imageData = image;
+                _fetchedImages.add(image);
                 _isMediaSelected = true;
               });
             }
@@ -313,6 +314,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         16, (_) => characters.codeUnitAt(random.nextInt(characters.length))));
   }
 
+  Future<File> _saveImageToFile(Uint8List imageData) async {
+    final directory = await getTemporaryDirectory();
+    final imagePath =
+        '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
+    final imageFile = File(imagePath);
+    return await imageFile.writeAsBytes(imageData);
+  }
+
   Future<void> _saveMemoToServer() async {
     widget.initialMemoId = _generateRandomId();
     var url = Uri.parse('$SERVER_IP/memo');
@@ -333,8 +342,16 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       request.fields['data_txt'] = "";
     }
 
+    // Add user-selected media files
     for (var filePath in _mediaPaths) {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
+    }
+
+    // Convert fetched images to files and add them to the request
+    for (var imageData in _fetchedImages) {
+      final imageFile = await _saveImageToFile(imageData);
+      request.files
+          .add(await http.MultipartFile.fromPath('files', imageFile.path));
     }
 
     for (var filePath in _filePaths) {
@@ -346,25 +363,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       print('메모 저장 성공');
     } else {
       print('메모 저장 실패: ${response.statusCode}');
-    }
-  }
-
-  Future<void> _uploadMedia(String mediaPath, Map<String, dynamic> body) async {
-    final url = Uri.parse('$SERVER_IP/upload');
-    final request = http.MultipartRequest('POST', url);
-
-    request.fields
-        .addAll(body.map((key, value) => MapEntry(key, value.toString())));
-    request.files.add(await http.MultipartFile.fromPath('file', mediaPath));
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    final responseData = jsonDecode(responseBody);
-
-    if (response.statusCode == 201) {
-      print('미디어 업로드 성공');
-    } else {
-      print('미디어 업로드 실패: ${response.statusCode}');
     }
   }
 
@@ -540,9 +538,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     try {
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = tempDir.path;
-      _filePath = '$tempPath/recording.aac'; // 저장할 파일 경로 설정
+      _filePath =
+          '$tempPath/recording_${DateTime.now().millisecondsSinceEpoch}.aac'; // 저장할 파일 경로 설정
 
-      await _recorder.startRecorder(toFile: 'recording.aac');
+      await _recorder.startRecorder(toFile: _filePath); // 경로를 사용하여 녹음 시작
       setState(() {
         _isRecording = true;
       });
@@ -551,30 +550,21 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  // 녹음 중지
+// 녹음 중지
   Future<void> _stopRecording() async {
     if (_isRecording) {
       try {
         await _recorder.stopRecorder();
         setState(() {
           _isRecording = false;
+          if (_filePath != null) {
+            _mediaPaths.add(_filePath!); // 저장된 파일 경로를 미디어 리스트에 추가
+          }
         });
         print("Recording stopped and saved at $_filePath");
       } catch (e) {
         print("Error stopping recorder: $e");
       }
-    }
-  }
-
-  Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-
-    if (result != null) {
-      final file = File(result.files.single.path!);
-      setState(() {
-        _filePath = file.path;
-        _filePaths.add(_filePath!);
-      });
     }
   }
 
@@ -835,70 +825,103 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       ),
                       child: Column(
                         children: [
-                          if (_mediaPaths.isNotEmpty)
+                          if (_mediaPaths.isNotEmpty ||
+                              _fetchedImages.isNotEmpty)
                             Expanded(
                               flex: 5,
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
-                                itemCount: _mediaPaths.length,
+                                itemCount:
+                                    _mediaPaths.length + _fetchedImages.length,
                                 itemBuilder: (context, index) {
-                                  final filePath = _mediaPaths[index];
-                                  final isVideo = filePath.endsWith('.mp4') ||
-                                      filePath.endsWith('.MOV') ||
-                                      filePath.endsWith('.mov');
-                                  return GestureDetector(
-                                    onTap: () => _toggleMediaSelection(index),
-                                    child: Stack(
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 8.0, horizontal: 8.0),
-                                          child: AspectRatio(
-                                            aspectRatio: 1.0,
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(16.0),
-                                              child: isVideo
-                                                  ? _videoControllers[index] !=
-                                                              null &&
-                                                          _videoControllers[
-                                                                  index]!
-                                                              .value
-                                                              .isInitialized
-                                                      ? VideoPlayer(
-                                                          _videoControllers[
-                                                              index]!)
-                                                      : Center(
-                                                          child:
-                                                              CircularProgressIndicator(),
-                                                        )
-                                                  : Image.file(
-                                                      File(filePath),
-                                                      fit: BoxFit.cover,
-                                                    ),
-                                            ),
+                                  if (index < _fetchedImages.length) {
+                                    final imageData = _fetchedImages[index];
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8.0, horizontal: 8.0),
+                                      child: AspectRatio(
+                                        aspectRatio: 1.0,
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16.0),
+                                          child: Image.memory(
+                                            imageData,
+                                            fit: BoxFit.cover,
                                           ),
                                         ),
-                                        if (_selectedMediaIndex == index)
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: GestureDetector(
-                                              onTap: () => _removeMedia(index),
-                                              child: CircleAvatar(
-                                                backgroundColor: Colors.grey,
-                                                radius: 16,
-                                                child: Icon(
-                                                  Icons.close,
-                                                  size: 16,
-                                                  color: Colors.white,
+                                      ),
+                                    );
+                                  } else {
+                                    final mediaIndex =
+                                        index - _fetchedImages.length;
+                                    final filePath = _mediaPaths[mediaIndex];
+                                    final isVideo = filePath.endsWith('.mp4') ||
+                                        filePath.endsWith('.MOV') ||
+                                        filePath.endsWith('.mov');
+                                    final isAudio =
+                                        filePath.endsWith('.aac'); // 녹음 파일인지 확인
+
+                                    return GestureDetector(
+                                      onTap: () =>
+                                          _toggleMediaSelection(mediaIndex),
+                                      child: Stack(
+                                        children: [
+                                          if (!isAudio)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8.0,
+                                                      horizontal: 8.0),
+                                              child: AspectRatio(
+                                                aspectRatio: 1.0,
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          16.0),
+                                                  child: isVideo
+                                                      ? _videoControllers[
+                                                                      mediaIndex] !=
+                                                                  null &&
+                                                              _videoControllers[
+                                                                      mediaIndex]!
+                                                                  .value
+                                                                  .isInitialized
+                                                          ? VideoPlayer(
+                                                              _videoControllers[
+                                                                  mediaIndex]!)
+                                                          : Center(
+                                                              child:
+                                                                  CircularProgressIndicator(),
+                                                            )
+                                                      : Image.file(
+                                                          File(filePath),
+                                                          fit: BoxFit.cover,
+                                                        ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
+                                          if (_selectedMediaIndex == mediaIndex)
+                                            Positioned(
+                                              top: 8,
+                                              right: 8,
+                                              child: GestureDetector(
+                                                onTap: () =>
+                                                    _removeMedia(mediaIndex),
+                                                child: CircleAvatar(
+                                                  backgroundColor: Colors.grey,
+                                                  radius: 16,
+                                                  child: Icon(
+                                                    Icons.close,
+                                                    size: 16,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }
                                 },
                               ),
                             ),
@@ -921,19 +944,32 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                             flex: 5,
                             child: Container(
                               padding: EdgeInsets.symmetric(horizontal: 16.0),
-                              child: TextField(
-                                controller: _controller,
-                                maxLines: null,
-                                focusNode: _focusNode,
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: '메모를 입력하세요...',
-                                ),
-                                style: TextStyle(
-                                  fontSize: 16.0,
-                                  color: Colors.black,
-                                ),
-                              ),
+                              child: _isMediaSelected && _imageData != null
+                                  ? Container(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            screenWidth * 0.9, // 이미지의 최대 너비를 제한
+                                        maxHeight: screenHeight *
+                                            0.4, // 이미지의 최대 높이를 제한
+                                      ),
+                                      child: Image.memory(
+                                        _imageData!,
+                                        fit: BoxFit.contain, // 이미지를 원래 비율로 맞춤
+                                      ),
+                                    )
+                                  : TextField(
+                                      controller: _controller,
+                                      maxLines: null,
+                                      focusNode: _focusNode,
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        hintText: '메모를 입력하세요...',
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 16.0,
+                                        color: Colors.black,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],
