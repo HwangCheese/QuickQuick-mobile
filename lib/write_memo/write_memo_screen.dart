@@ -13,6 +13,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 import '../../globals.dart';
+import '../calendar/calendar_screen.dart';
 
 class WriteMemoScreen extends StatefulWidget {
   final Color? initialColor;
@@ -119,6 +120,66 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _initRecorder();
     _videoControllers = [];
     _checkPermissions();
+    _controller.addListener(_handleTextChanged);
+  }
+
+  void _handleTextChanged() {
+    String text = _controller.text;
+    List<String> lines = text.split('\n');
+
+    for (String line in lines) {
+      if (_isEventLine(line)) {
+        _showEventConfirmationDialog(line);
+        break;
+      }
+    }
+  }
+
+  bool _isEventLine(String line) {
+    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
+    return pattern.hasMatch(line);
+  }
+
+  void _showEventConfirmationDialog(String line) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('일정 추가 확인'),
+          content: Text('이 내용을 캘린더에 추가하시겠습니까?\n$line'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('추가'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processEventLine(line);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _processEventLine(String line) {
+    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
+    Match? match = pattern.firstMatch(line);
+
+    if (match != null) {
+      int month = int.parse(match.group(1)!);
+      int day = int.parse(match.group(2)!);
+      String eventDescription = match.group(3)!;
+      DateTime eventDate = DateTime(DateTime.now().year, month, day);
+
+      // 캘린더에 이벤트 추가
+      CalendarScreen.addEvent(context, eventDate, eventDescription);
+    }
   }
 
   Future<void> _initializeMemoData() async {
@@ -175,6 +236,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               setState(() {
                 _mediaPaths.add(tempFile.path);
                 _isMediaSelected = true;
+              });
+            }
+          } else {
+            // 파일 포맷이 텍스트, 비디오, 이미지가 아닌 경우
+            final fileData = await _getFile(item['data_id']);
+            if (fileData != null) {
+              final directory = await getApplicationDocumentsDirectory();
+              final filePath = '${directory.path}/${item['file_name']}';
+              final file = File(filePath);
+              await file.writeAsBytes(fileData);
+              setState(() {
+                _filePaths.add(file.path);
               });
             }
           }
@@ -249,6 +322,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       }
     } catch (e) {
       print('이미지 불러오기 실패: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List?> _getFile(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        print('Failed to load file: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Failed to load file: $e');
       return null;
     }
   }
@@ -350,6 +439,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   @override
   void dispose() {
     _recorder.closeRecorder();
+    _controller.removeListener(_handleTextChanged);
+    _controller.dispose();
+    _focusNode.dispose();
     _videoControllers.forEach((controller) {
       controller?.dispose();
     });
@@ -791,6 +883,56 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  // 파일 아이템 UI
+  Widget _buildFileTile(String filePath) {
+    final fileName = filePath.split('/').last;
+
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 8.0),
+      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(58.0),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.insert_drive_file, color: Colors.grey[700]), // 파일 아이콘
+          SizedBox(width: 16.0),
+          Expanded(
+            child: Text(
+              fileName,
+              style: TextStyle(color: Colors.black, fontSize: 16.0),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.download, color: Colors.grey),
+            onPressed: () => _downloadFile(filePath, fileName),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadFile(String url, String fileName) async {
+    try {
+      // 애플리케이션의 문서 디렉토리 가져오기
+      final directory = await getApplicationDocumentsDirectory();
+      final savePath = '${directory.path}/$fileName';
+
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final file = File(savePath);
+        await file.writeAsBytes(response.bodyBytes);
+        _showMessage('파일이 성공적으로 다운로드되었습니다: $savePath');
+      } else {
+        _showMessage('파일 다운로드 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showMessage('파일 다운로드 중 오류 발생: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -900,6 +1042,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
+                      SizedBox(height: 10.0),
                       Image.asset(
                         'assets/images/img_quickduck.png',
                         height: 80,
@@ -987,19 +1130,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   },
                                 ),
                               ),
-                            if (_filePath != null)
+                            if (_filePaths.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.all(8.0),
-                                child: Container(
-                                  color: Colors.white,
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Text(
-                                    _filePath!.split('/').last,
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18,
-                                    ),
-                                  ),
+                                child: Column(
+                                  children: _filePaths
+                                      .map((filePath) =>
+                                          _buildFileTile(filePath))
+                                      .toList(),
                                 ),
                               ),
                             Expanded(
@@ -1103,7 +1241,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     },
                                     child: Container(
                                       margin:
-                                          EdgeInsets.symmetric(horizontal: 3),
+                                          EdgeInsets.symmetric(horizontal: 10),
                                       width: 50,
                                       height: 50,
                                       decoration: BoxDecoration(
