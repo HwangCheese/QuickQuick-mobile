@@ -691,15 +691,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   // 녹음 시작
   Future<void> _startRecording() async {
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      status = await Permission.microphone.request();
-      if (!status.isGranted) {
-        // 권한이 부여되지 않았으므로, 녹음을 시작하지 않음.
-        print("Microphone permission not granted");
-        return;
-      }
-    }
+    // var status = await Permission.microphone.status;
+    // if (!status.isGranted) {
+    //   status = await Permission.microphone.request();
+    //   if (!status.isGranted) {
+    //     // 권한이 부여되지 않았으므로, 녹음을 시작하지 않음.
+    //     print("Microphone permission not granted");
+    //     return;
+    //   }
+    // }
 
     // 권한이 부여되었으므로, 녹음을 시작함.
     try {
