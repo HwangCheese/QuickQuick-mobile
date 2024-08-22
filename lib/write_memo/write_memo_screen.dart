@@ -36,9 +36,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Color _backgroundColor = Colors.white;
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _picker = ImagePicker();
+  final FlutterSoundPlayer _player = FlutterSoundPlayer();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  String? _recordedFilePath;
   bool _isRecording = false;
-  String? _audioPath;
   List<String> _mediaPaths = [];
   String? _filePath;
   List<String> _filePaths = [];
@@ -239,7 +240,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               });
             }
           } else {
-            // 파일 포맷이 텍스트, 비디오, 이미지가 아닌 경우
+            // 파일 포맷이 텍스트, 비디오, 이미지, 오디오가 아닌 경우
             final fileData = await _getFile(item['data_id']);
             if (fileData != null) {
               final directory = await getApplicationDocumentsDirectory();
@@ -704,10 +705,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     try {
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = tempDir.path;
-      _filePath =
+      _recordedFilePath =
           '$tempPath/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
 
-      await _recorder.startRecorder(toFile: _filePath); // 경로를 사용하여 녹음 시작
+      await _recorder.startRecorder(
+        toFile: _recordedFilePath,
+        codec: Codec.aacADTS,
+      );
       setState(() {
         _isRecording = true;
       });
@@ -716,21 +720,42 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-// 녹음 중지
+  // 녹음 중지
   Future<void> _stopRecording() async {
     if (_isRecording) {
       try {
         await _recorder.stopRecorder();
         setState(() {
           _isRecording = false;
-          if (_filePath != null) {
-            _mediaPaths.add(_filePath!); // 저장된 파일 경로를 미디어 리스트에 추가
+          if (_recordedFilePath != null) {
+            _mediaPaths.add(_recordedFilePath!); // 녹음된 파일을 미디어 리스트에 추가
           }
         });
-        print("Recording stopped and saved at $_filePath");
+        print("Recording stopped and saved at $_recordedFilePath");
       } catch (e) {
         print("Error stopping recorder: $e");
       }
+    }
+  }
+
+  // 녹음 파일 재생
+  Future<void> _playRecording(String filePath) async {
+    try {
+      // 플레이어를 열어야 합니다.
+      if (!_player.isOpen()) {
+        await _player.openPlayer();
+      }
+
+      await _player.startPlayer(
+        fromURI: filePath,
+        whenFinished: () {
+          setState(() {
+            print("Playback finished");
+          });
+        },
+      );
+    } catch (e) {
+      print("Error playing recording: $e");
     }
   }
 
@@ -747,26 +772,28 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  Future<void> _shareMemoWithFriend(String friendUserId) async {
-    final url = Uri.parse('$SERVER_IP/send-memo');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'sourceUserId': USER_ID,
-        'targetUserId': friendUserId,
-        'memoId': widget.initialMemoId,
-      }),
-    );
+  Future<void> _shareMemoWithFriends(List<String> friendUserIds) async {
+    for (String friendUserId in friendUserIds) {
+      final url = Uri.parse('$SERVER_IP/send-memo');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'sourceUserId': USER_ID,
+          'targetUserId': friendUserId,
+          'memoId': widget.initialMemoId,
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      print('메모 공유 성공');
-      _showMessage('메모가 성공적으로 공유되었습니다.');
-    } else {
-      print('$USER_ID, $friendUserId, ${widget.initialMemoId}');
-      print('메모 공유 실패: ${response.statusCode}');
-      _showMessage('메모 공유에 실패했습니다.');
+      if (response.statusCode != 200) {
+        print('메모 공유 실패: ${response.statusCode}');
+        _showMessage('메모 공유에 실패했습니다.');
+        return;
+      }
     }
+
+    print('메모 공유 성공');
+    _showMessage('메모가 성공적으로 공유되었습니다.');
   }
 
   Future<void> _showFriendSelectionDialog() async {
@@ -780,35 +807,56 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               })
           .toList();
 
+      List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
+
       showDialog(
         context: context,
         builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('친구 선택'),
-            content: Container(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: friends.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(friends[index]['user_name']!),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _shareMemoWithFriend(friends[index]['user_id']!);
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('친구 선택'),
+                content: Container(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: friends.length,
+                    itemBuilder: (context, index) {
+                      return CheckboxListTile(
+                        title: Text(friends[index]['user_name']!),
+                        value: selectedFriendIds
+                            .contains(friends[index]['user_id']),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              selectedFriendIds.add(friends[index]['user_id']!);
+                            } else {
+                              selectedFriendIds
+                                  .remove(friends[index]['user_id']);
+                            }
+                          });
+                        },
+                      );
                     },
-                  );
-                },
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('취소'),
-              ),
-            ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _shareMemoWithFriends(selectedFriendIds);
+                    },
+                    child: Text('전송'),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
@@ -843,6 +891,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         _videoControllers[index]?.dispose();
         _videoControllers.removeAt(index);
       }
+      _recorder.closeRecorder();
       _selectedMediaIndex = null;
     });
   }
@@ -914,19 +963,36 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
-  Future<void> _downloadFile(String url, String fileName) async {
+  Future<void> _downloadFile(String filePath, String fileName) async {
     try {
-      // 애플리케이션의 문서 디렉토리 가져오기
-      final directory = await getApplicationDocumentsDirectory();
-      final savePath = '${directory.path}/$fileName';
+      String savePath;
 
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final file = File(savePath);
-        await file.writeAsBytes(response.bodyBytes);
+      // 플랫폼에 따라 저장 경로를 다르게 설정
+      if (Platform.isAndroid) {
+        // Android의 'Downloads' 폴더 경로 가져오기
+        final directory = await getExternalStorageDirectory();
+        savePath = '${directory!.path}/$fileName';
+      } else if (Platform.isIOS) {
+        // iOS의 'Documents' 폴더 경로 가져오기
+        final directory = await getApplicationDocumentsDirectory();
+        savePath = '${directory.path}/$fileName';
+      } else {
+        // Web 또는 다른 플랫폼은 지원되지 않음
+        throw UnsupportedError('Unsupported platform');
+      }
+
+      print("파일 저장 경로 $savePath");
+
+      // 파일 데이터를 가져와서 로컬에 저장
+      final file = File(filePath);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        final localFile = File(savePath);
+        await localFile.writeAsBytes(bytes);
+
         _showMessage('파일이 성공적으로 다운로드되었습니다: $savePath');
       } else {
-        _showMessage('파일 다운로드 실패: ${response.statusCode}');
+        _showMessage('파일이 존재하지 않습니다.');
       }
     } catch (e) {
       _showMessage('파일 다운로드 중 오류 발생: $e');
@@ -1070,15 +1136,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 flex: 5,
                                 child: ListView.builder(
                                   scrollDirection: Axis.horizontal,
-                                  itemCount: _mediaPaths
-                                      .length, // 중복 방지를 위해 하나의 리스트만 사용
+                                  itemCount:
+                                      _mediaPaths.length, // 미디어 리스트 수 만큼 표시
                                   itemBuilder: (context, index) {
                                     final filePath = _mediaPaths[index];
                                     final isVideo = filePath.endsWith('.mp4') ||
                                         filePath.endsWith('.MOV');
+                                    final isAudio = filePath.endsWith('.aac');
 
                                     return GestureDetector(
-                                      onTap: () => _toggleMediaSelection(index),
+                                      onTap: () {
+                                        if (isAudio) {
+                                          _playRecording(filePath);
+                                        } else {
+                                          _toggleMediaSelection(index);
+                                        }
+                                      },
                                       child: Stack(
                                         children: [
                                           Padding(
@@ -1089,22 +1162,39 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                               child: ClipRRect(
                                                 borderRadius:
                                                     BorderRadius.circular(16.0),
-                                                child: isVideo
-                                                    ? _videoControllers[
-                                                                    index] !=
-                                                                null &&
-                                                            _videoControllers[
-                                                                    index]!
-                                                                .value
-                                                                .isInitialized
-                                                        ? VideoPlayer(
-                                                            _videoControllers[
-                                                                index]!)
-                                                        : Center(
-                                                            child:
-                                                                CircularProgressIndicator())
-                                                    : Image.file(File(filePath),
-                                                        fit: BoxFit.cover),
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    border: Border.all(
+                                                      color: isAudio
+                                                          ? Colors.blue
+                                                          : Colors
+                                                              .transparent, // 오디오 파일에만 테두리 추가
+                                                      width: 2.0,
+                                                    ),
+                                                  ),
+                                                  child: isVideo
+                                                      ? _videoControllers[index] !=
+                                                                  null &&
+                                                              _videoControllers[
+                                                                      index]!
+                                                                  .value
+                                                                  .isInitialized
+                                                          ? VideoPlayer(
+                                                              _videoControllers[
+                                                                  index]!)
+                                                          : Center(
+                                                              child:
+                                                                  CircularProgressIndicator())
+                                                      : isAudio
+                                                          ? Icon(
+                                                              Icons.audiotrack,
+                                                              size:
+                                                                  50) // 오디오 파일은 아이콘으로 표시
+                                                          : Image.file(
+                                                              File(filePath),
+                                                              fit:
+                                                                  BoxFit.cover),
+                                                ),
                                               ),
                                             ),
                                           ),
