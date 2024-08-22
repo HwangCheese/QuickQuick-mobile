@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
 import 'dart:convert';
 import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
 import 'dart:io'; // File 클래스를 사용하기 위해 추가
@@ -19,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> memos = [];
   List<Map<String, dynamic>> datas = [];
+  List<VideoPlayerController?> _homeVideoControllers = [];
   bool isSelectionMode = false;
   Set<int> selectedMemos = Set<int>();
   Uint8List? imageData;
@@ -105,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
               'memo_id': item['memo_id'],
               'data_id': item['data_id'],
               'format': item['format'],
+              'content_type': item['content_type'],
             });
           }
 
@@ -144,6 +148,27 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
       );
+    } else if (format == 'mp4' || format == 'MOV') {
+      // 비디오 컨트롤러가 이미 존재하는지 확인
+      if (_homeVideoControllers.length > index &&
+          _homeVideoControllers[index] != null) {
+        return AspectRatio(
+          aspectRatio: _homeVideoControllers[index]!.value.aspectRatio,
+          child: VideoPlayer(_homeVideoControllers[index]!),
+        );
+      } else {
+        // 비디오를 다운로드하고 컨트롤러를 초기화
+        final videoPath = await _getVideo(dataId);
+        if (videoPath != null) {
+          _initializeVideoController(videoPath, index);
+          return AspectRatio(
+            aspectRatio: _homeVideoControllers[index]!.value.aspectRatio,
+            child: VideoPlayer(_homeVideoControllers[index]!),
+          );
+        } else {
+          return Text('비디오를 불러올 수 없습니다.');
+        }
+      }
     } else if (format == 'jpg' || format == 'png' || format == 'jpeg') {
       return FutureBuilder<Uint8List?>(
         future: _getImage(dataId),
@@ -164,6 +189,26 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } else {
       return Text('지원하지 않는 형식입니다.');
+    }
+  }
+
+  void _initializeVideoController(String videoPath, int index) {
+    try {
+      final controller = VideoPlayerController.file(File(videoPath));
+
+      controller.initialize().then((_) {
+        setState(() {
+          if (_homeVideoControllers.length <= index) {
+            _homeVideoControllers.length = index + 1;
+          }
+          _homeVideoControllers[index] = controller;
+          _homeVideoControllers[index]?.play(); // Auto-play the video
+        });
+      }).catchError((error) {
+        print("Video initialization failed: $error");
+      });
+    } catch (e) {
+      print("Error initializing video: $e");
     }
   }
 
@@ -196,6 +241,28 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('이미지 불러오기 실패: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _getVideo(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // 서버로부터 받은 비디오 파일을 로컬에 저장한 후 경로를 반환
+        final directory = await getTemporaryDirectory();
+        final videoPath =
+            '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.mp4';
+        final videoFile = File(videoPath);
+        await videoFile.writeAsBytes(response.bodyBytes);
+        return videoPath;
+      } else {
+        print('Failed to load video: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('비디오 불러오기 실패: $e');
       return null;
     }
   }
@@ -547,39 +614,50 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              Stack(
                 children: <Widget>[
-                  PopupMenuButton<int>(
-                    icon: Icon(Icons.more_vert, size: 35.0),
-                    onSelected: (int result) {
-                      if (result == 0) {
-                        _toggleSelectionMode();
-                      } else if (result == 1) {
-                        _navigateToCalendar(context);
-                      } else if (result == 2) {
-                        _navigateToFriendsList(context);
-                      }
-                    },
-                    itemBuilder: (BuildContext context) =>
-                        <PopupMenuEntry<int>>[
-                      const PopupMenuItem<int>(
-                        value: 0,
-                        child: Text('선택'),
+                  Center(
+                    child: Transform.translate(
+                      offset: Offset(10, -25), // y값을 음수로 설정하여 이미지를 위로 이동
+                      child: Image.asset(
+                        'assets/images/img_logo.png',
+                        height: 100,
                       ),
-                      const PopupMenuItem<int>(
-                        value: 1,
-                        child: Text('캘린더'),
-                      ),
-                      const PopupMenuItem<int>(
-                        value: 2,
-                        child: Text('친구 목록'),
-                      ),
-                    ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: PopupMenuButton<int>(
+                      icon: Icon(Icons.more_vert, size: 35.0),
+                      onSelected: (int result) {
+                        if (result == 0) {
+                          _toggleSelectionMode();
+                        } else if (result == 1) {
+                          _navigateToCalendar(context);
+                        } else if (result == 2) {
+                          _navigateToFriendsList(context);
+                        }
+                      },
+                      itemBuilder: (BuildContext context) =>
+                          <PopupMenuEntry<int>>[
+                        const PopupMenuItem<int>(
+                          value: 0,
+                          child: Text('선택'),
+                        ),
+                        const PopupMenuItem<int>(
+                          value: 1,
+                          child: Text('캘린더'),
+                        ),
+                        const PopupMenuItem<int>(
+                          value: 2,
+                          child: Text('친구 목록'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              SizedBox(height: 16.0),
               Expanded(
                 child: GridView.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -600,6 +678,21 @@ class _HomeScreenState extends State<HomeScreen> {
                             (item) => item as Map<String, dynamic>)
                         .toList();
 
+                    // 첫 번째 이미지나 비디오 또는 텍스트 찾기
+                    Map<String, dynamic>? firstMedia;
+                    if (memoDatas.isNotEmpty) {
+                      firstMedia = memoDatas.firstWhere(
+                        (data) =>
+                            data['format'] == 'jpg' ||
+                            data['format'] == 'png' ||
+                            data['format'] == 'jpeg' ||
+                            data['format'] == 'mp4' ||
+                            data['format'] == 'MOV' ||
+                            data['format'] == 'txt',
+                        orElse: () => {},
+                      );
+                    }
+
                     return GestureDetector(
                       onTap: isSelectionMode
                           ? () => _toggleMemoSelection(index)
@@ -615,13 +708,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: memos[index]['color'] ?? Colors.white,
                             ),
                             child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  for (var data in memoDatas) ...[
-                                    FutureBuilder<Widget>(
-                                      future: _getDataWidget(data['data_id'],
-                                          data['format'], index),
+                              child: firstMedia != null && firstMedia.isNotEmpty
+                                  ? FutureBuilder<Widget>(
+                                      future: _getDataWidget(
+                                          firstMedia['data_id'],
+                                          firstMedia['format'],
+                                          index),
                                       builder: (context, snapshot) {
                                         if (snapshot.connectionState ==
                                             ConnectionState.done) {
@@ -634,10 +726,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                           return CircularProgressIndicator();
                                         }
                                       },
+                                    )
+                                  : Text(
+                                      '내용 없음',
+                                      style: TextStyle(fontSize: 16.0),
                                     ),
-                                  ],
-                                ],
-                              ),
                             ),
                           ),
                           if (memos[index]['isPinned'])
