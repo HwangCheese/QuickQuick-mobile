@@ -151,7 +151,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         final List<dynamic> memoData = json.decode(response.body);
 
         for (var item in memoData) {
-          print('format: ${item['format']}');
           if (item['format'] == 'txt') {
             final text = await _getData(item['data_id']);
             setState(() {
@@ -165,30 +164,39 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 _initializeVideoController(videoPath, _mediaPaths.length - 1);
                 _isMediaSelected = true;
               });
-            } else if (item['format'] == 'png' ||
-                item['format'] == 'jpg' ||
-                item['format'] == 'jpeg') {
-              final image = await _getImage(item['data_id']);
-              if (image != null) {
-                print("**************** 이미지 있음 *****************");
-                setState(() {
-                  _fetchedImages.add(image);
-                  _isMediaSelected = true;
-                });
-              }
+            }
+          } else if (item['format'] == 'png' ||
+              item['format'] == 'jpg' ||
+              item['format'] == 'jpeg') {
+            final imageData = await _getImage(item['data_id']);
+            if (imageData != null) {
+              // Save the image to a temporary file and add to _mediaPaths
+              final tempFile = await _saveImageToFile(imageData);
+              setState(() {
+                _mediaPaths.add(tempFile.path);
+                _isMediaSelected = true;
+              });
             }
           }
         }
       } else {
-        print('Failed to load memo datas: ${response.statusCode}');
+        print('Failed to load memo data: ${response.statusCode}');
       }
     } catch (e) {
-      print('Failed to load memo datas: $e');
+      print('Failed to load memo data: $e');
     } finally {
       setState(() {
-        _isLoading = false; // 데이터 로드가 끝난 후 로딩 상태 해제
+        _isLoading = false;
       });
     }
+  }
+
+  Future<File> _saveImageToFile(Uint8List imageData) async {
+    final directory = await getTemporaryDirectory();
+    final imagePath =
+        '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
+    final imageFile = File(imagePath);
+    return await imageFile.writeAsBytes(imageData);
   }
 
   Future<String?> _getVideo(String dataId) async {
@@ -234,7 +242,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        print('Image data: ${response.bodyBytes}');
         return response.bodyBytes;
       } else {
         print('Failed to load image: ${response.statusCode}');
@@ -355,14 +362,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final random = Random();
     return String.fromCharCodes(Iterable.generate(
         16, (_) => characters.codeUnitAt(random.nextInt(characters.length))));
-  }
-
-  Future<File> _saveImageToFile(Uint8List imageData) async {
-    final directory = await getTemporaryDirectory();
-    final imagePath =
-        '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.png';
-    final imageFile = File(imagePath);
-    return await imageFile.writeAsBytes(imageData);
   }
 
   bool _hasMemoChanged() {
@@ -851,25 +850,33 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     onPressed: _getSummary,
                   ),
                   SizedBox(width: 16.0),
-                  DropdownButton<String>(
-                    value: _selectedLanguage,
-                    items: _languages.map((String language) {
-                      return DropdownMenuItem<String>(
-                        value: language,
-                        child: Text(_getLanguageName(language)),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedLanguage = newValue!;
-                      });
-                    },
-                  ),
-                  SizedBox(width: 16.0),
                   IconButton(
                     iconSize: 30.0,
                     icon: const Icon(Icons.translate),
-                    onPressed: _translate,
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return Container(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: _languages.map((String language) {
+                                return ListTile(
+                                  title: Text(_getLanguageName(language)),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedLanguage = language;
+                                    });
+                                    Navigator.pop(context); // 메뉴를 닫음
+                                    _translate(); // 번역 실행
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          );
+                        },
+                      );
+                    },
                     tooltip: 'Translate Text',
                   ),
                   SizedBox(width: 16.0),
@@ -897,10 +904,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         'assets/images/img_quickduck.png',
                         height: 80,
                       ),
-                      SizedBox(height: 5.0),
+                      SizedBox(height: 25.0),
                       Container(
                         width: screenWidth * 0.9,
-                        height: screenHeight * 0.6,
+                        height: screenHeight * 0.5,
                         decoration: BoxDecoration(
                           color: _backgroundColor,
                           borderRadius: BorderRadius.circular(16.0),
@@ -920,100 +927,63 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 flex: 5,
                                 child: ListView.builder(
                                   scrollDirection: Axis.horizontal,
-                                  itemCount: _mediaPaths.length +
-                                      _fetchedImages.length,
+                                  itemCount: _mediaPaths
+                                      .length, // 중복 방지를 위해 하나의 리스트만 사용
                                   itemBuilder: (context, index) {
-                                    if (index < _fetchedImages.length) {
-                                      final imageData = _fetchedImages[index];
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 8.0, horizontal: 8.0),
-                                        child: AspectRatio(
-                                          aspectRatio: 1.0,
-                                          child: ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(16.0),
-                                            child: Image.memory(
-                                              imageData,
-                                              fit: BoxFit.cover,
+                                    final filePath = _mediaPaths[index];
+                                    final isVideo = filePath.endsWith('.mp4') ||
+                                        filePath.endsWith('.MOV');
+
+                                    return GestureDetector(
+                                      onTap: () => _toggleMediaSelection(index),
+                                      child: Stack(
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8.0, horizontal: 8.0),
+                                            child: AspectRatio(
+                                              aspectRatio: 1.0,
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(16.0),
+                                                child: isVideo
+                                                    ? _videoControllers[
+                                                                    index] !=
+                                                                null &&
+                                                            _videoControllers[
+                                                                    index]!
+                                                                .value
+                                                                .isInitialized
+                                                        ? VideoPlayer(
+                                                            _videoControllers[
+                                                                index]!)
+                                                        : Center(
+                                                            child:
+                                                                CircularProgressIndicator())
+                                                    : Image.file(File(filePath),
+                                                        fit: BoxFit.cover),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      );
-                                    } else {
-                                      final mediaIndex =
-                                          index - _fetchedImages.length;
-                                      final filePath = _mediaPaths[mediaIndex];
-                                      final isVideo =
-                                          filePath.endsWith('.mp4') ||
-                                              filePath.endsWith('.MOV') ||
-                                              filePath.endsWith('.mov');
-                                      final isAudio = filePath
-                                          .endsWith('.aac'); // 녹음 파일인지 확인
-
-                                      return GestureDetector(
-                                        onTap: () =>
-                                            _toggleMediaSelection(mediaIndex),
-                                        child: Stack(
-                                          children: [
-                                            if (!isAudio)
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 8.0,
-                                                        horizontal: 8.0),
-                                                child: AspectRatio(
-                                                  aspectRatio: 1.0,
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            16.0),
-                                                    child: isVideo
-                                                        ? _videoControllers[
-                                                                        mediaIndex] !=
-                                                                    null &&
-                                                                _videoControllers[
-                                                                        mediaIndex]!
-                                                                    .value
-                                                                    .isInitialized
-                                                            ? VideoPlayer(
-                                                                _videoControllers[
-                                                                    mediaIndex]!)
-                                                            : Center(
-                                                                child:
-                                                                    CircularProgressIndicator(),
-                                                              )
-                                                        : Image.file(
-                                                            File(filePath),
-                                                            fit: BoxFit.cover,
-                                                          ),
-                                                  ),
-                                                ),
-                                              ),
-                                            if (_selectedMediaIndex ==
-                                                mediaIndex)
-                                              Positioned(
-                                                top: 8,
-                                                right: 8,
-                                                child: GestureDetector(
-                                                  onTap: () =>
-                                                      _removeMedia(mediaIndex),
-                                                  child: CircleAvatar(
-                                                    backgroundColor:
-                                                        Colors.grey,
-                                                    radius: 16,
-                                                    child: Icon(
-                                                      Icons.close,
+                                          if (_selectedMediaIndex == index)
+                                            Positioned(
+                                              top: 8,
+                                              right: 8,
+                                              child: GestureDetector(
+                                                onTap: () =>
+                                                    _removeMedia(index),
+                                                child: CircleAvatar(
+                                                  backgroundColor: Colors.grey,
+                                                  radius: 16,
+                                                  child: Icon(Icons.close,
                                                       size: 16,
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
+                                                      color: Colors.white),
                                                 ),
                                               ),
-                                          ],
-                                        ),
-                                      );
-                                    }
+                                            ),
+                                        ],
+                                      ),
+                                    );
                                   },
                                 ),
                               ),
@@ -1112,7 +1082,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 TextStyle(fontSize: 16.0, color: Colors.black),
                           ),
                         ),
-                      SizedBox(height: 20.0),
+                      SizedBox(height: 40.0),
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: Container(
