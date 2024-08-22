@@ -128,16 +128,16 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       _initialText = _controller.text;
       _initialBackgroundColor = _backgroundColor;
       _initialMediaPaths = List.from(_mediaPaths);
-    } else {
+
       if (widget.initialColor != null) {
         _backgroundColor = widget.initialColor!;
       }
       if (widget.initialImageData != null) {
+        print('이미지 데이터 있음');
         _isMediaSelected = true;
         _fetchedImages.add(widget.initialImageData!);
       }
     }
-
     setState(() {
       _isLoading = false; // 로딩 상태 업데이트
     });
@@ -151,12 +151,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         final List<dynamic> memoData = json.decode(response.body);
 
         for (var item in memoData) {
+          print('format: ${item['format']}');
           if (item['format'] == 'txt') {
             final text = await _getData(item['data_id']);
             setState(() {
               _controller.text = text ?? '';
             });
-          } else if (item['format'] == 'MOV') {
+          } else if (item['format'] == 'MOV' || item['format'] == 'mp4') {
             final videoPath = await _getVideo(item['data_id']);
             if (videoPath != null) {
               setState(() {
@@ -164,9 +165,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 _initializeVideoController(videoPath, _mediaPaths.length - 1);
                 _isMediaSelected = true;
               });
-            } else {
+            } else if (item['format'] == 'png' ||
+                item['format'] == 'jpg' ||
+                item['format'] == 'jpeg') {
               final image = await _getImage(item['data_id']);
               if (image != null) {
+                print("**************** 이미지 있음 *****************");
                 setState(() {
                   _fetchedImages.add(image);
                   _isMediaSelected = true;
@@ -230,6 +234,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
+        print('Image data: ${response.bodyBytes}');
         return response.bodyBytes;
       } else {
         print('Failed to load image: ${response.statusCode}');
@@ -362,7 +367,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   bool _hasMemoChanged() {
     if (_controller.text != _initialText) return true;
-    if (_backgroundColor != _initialBackgroundColor) return true;
+    if (_backgroundColor != widget.initialColor!) return true;
     if (_mediaPaths.length != _initialMediaPaths.length) return true;
     for (int i = 0; i < _mediaPaths.length; i++) {
       if (_mediaPaths[i] != _initialMediaPaths[i]) return true;
@@ -792,17 +797,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
     return PopScope(
       onPopInvoked: (isGesture) {
         _saveMemoToServer(); // 서버에 메모를 저장하는 동작을 수행합니다.
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        backgroundColor: Color(0xFFE2F1FF),
+        backgroundColor: Color(0xFFFFE996),
         appBar: AppBar(
-          backgroundColor: Color(0xFFE2F1FF),
+          backgroundColor: Color(0xFFFFE996),
           leading: Padding(
             padding: const EdgeInsets.only(left: 16.0),
             child: BackButton(
@@ -890,7 +893,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      SizedBox(height: 20.0),
+                      Image.asset(
+                        'assets/images/img_quickduck.png',
+                        height: 80,
+                      ),
+                      SizedBox(height: 5.0),
                       Container(
                         width: screenWidth * 0.9,
                         height: screenHeight * 0.6,
