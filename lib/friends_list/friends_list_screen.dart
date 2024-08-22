@@ -34,18 +34,29 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
 
   Future<void> _fetchFriends() async {
     final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
+
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      print(data);
-      setState(() {
-        friends = data
-            .map<Map<String, String>>((friend) => {
-                  'user_name': friend['friend_name'],
-                })
-            .toList();
-        filteredFriends = friends;
-      });
+      try {
+        // 서버에서 받은 데이터의 구조 확인
+        final List<dynamic> data = json.decode(response.body);
+
+        setState(() {
+          // 친구 목록 업데이트
+          friends = data.map<Map<String, String>>((friend) {
+            // 'friend_name_set' 필드가 실제 서버 데이터에 맞는지 확인 필요
+            return {
+              'user_name': friend['friend_name_set'] ?? '',
+            };
+          }).toList();
+
+          filteredFriends = List.from(friends); // filteredFriends 갱신
+        });
+      } catch (e) {
+        print('JSON Parsing Error: $e');
+        _showMessage('서버 응답 처리 중 오류 발생');
+      }
     } else {
+      // 오류 처리
       _showMessage('친구 목록을 불러오는 데 실패했습니다.');
     }
   }
@@ -55,7 +66,6 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
   }
 
   Future<void> _addFriend(String friendUserName) async {
-    print('친구 이름: $friendUserName');
     final response = await http.post(
       Uri.parse('${SERVER_IP}/friend'),
       headers: <String, String>{
@@ -68,30 +78,79 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     );
 
     if (response.statusCode == 201) {
-      // 친구 추가 성공 후, 친구 목록을 새로고침하여 UI를 즉시 업데이트
-      print('친구 추가 성공');
       await _fetchFriends();
     } else {
       _showMessage('친구 추가 실패: ${json.decode(response.body)['error']}');
     }
   }
 
-  Future<void> _deleteFriend(String friendUserId) async {
+  Future<void> _updateFriendName(
+      String oldFriendUserName, String newFriendUserName) async {
+    final url = Uri.parse('${SERVER_IP}/friend/name');
+
+    final requestBody = jsonEncode({
+      'user_name': USER_NAME,
+      'friend_user_name': oldFriendUserName,
+      'new_friend_name': newFriendUserName,
+    });
+
+    final response = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: requestBody,
+    );
+
+    print('Response Status: ${response.statusCode}');
+    print('Response Body: ${response.body}');
+
+    try {
+      if (response.statusCode == 200) {
+        setState(() {
+          // 친구 이름을 업데이트한 후, 데이터 상태를 갱신
+          final friendIndex = friends
+              .indexWhere((friend) => friend['user_name'] == oldFriendUserName);
+          if (friendIndex != -1) {
+            friends[friendIndex]['user_name'] = newFriendUserName;
+            filteredFriends = List.from(friends); // UI 업데이트를 위해 새 리스트로 설정
+          }
+        });
+      } else {
+        final responseBody = json.decode(response.body);
+        final errorMessage = responseBody['error'] ?? '알 수 없는 오류 발생';
+        _showMessage('친구 이름 수정 실패: $errorMessage');
+      }
+    } catch (e) {
+      print('JSON Parsing Error: $e');
+      _showMessage('서버 응답 처리 중 오류 발생');
+    }
+  }
+
+  Future<void> _deleteFriend(String friendUserName) async {
     final url = Uri.parse('${SERVER_IP}/friend');
+
+    final requestBody = jsonEncode({
+      'user_name': USER_NAME,
+      'friend_name_set': friendUserName, // friend_name_set으로 수정
+    });
+
     final response = await http.delete(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'user_id': USER_ID,
-        'friend_user_id': friendUserId,
-      }),
+      body: requestBody,
     );
+
+    print('Response Status: ${response.statusCode}');
+    print('Response Body: ${response.body}');
 
     if (response.statusCode == 200) {
       setState(() {
-        friends.removeWhere((friend) => friend['user_id'] == friendUserId);
-        filteredFriends = friends;
+        friends.removeWhere((friend) => friend['user_name'] == friendUserName);
+        filteredFriends = friends; // UI 업데이트
       });
+    } else {
+      final errorMessage =
+          json.decode(response.body)['error'] ?? '알 수 없는 오류 발생';
+      _showMessage('친구 삭제 실패: $errorMessage');
     }
   }
 
@@ -114,7 +173,69 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     );
   }
 
-  void _showDeleteFriendDialog(String friendUserId) {
+  void _showActionDialog(String friendUserName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('친구 옵션'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showUpdateFriendDialog(friendUserName);
+              },
+              child: Text('수정'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showDeleteFriendDialog(friendUserName);
+              },
+              child: Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showUpdateFriendDialog(String oldFriendUserName) {
+    final TextEditingController _newFriendController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('친구 이름 수정'),
+          content: TextField(
+            controller: _newFriendController,
+            decoration: InputDecoration(hintText: '새로운 친구 이름'),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (_newFriendController.text.isNotEmpty) {
+                  _updateFriendName(
+                      oldFriendUserName, _newFriendController.text);
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text('수정'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteFriendDialog(String friendUserName) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -130,7 +251,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             ),
             TextButton(
               onPressed: () {
-                _deleteFriend(friendUserId);
+                _deleteFriend(friendUserName);
                 Navigator.of(context).pop();
               },
               child: Text('삭제'),
@@ -194,8 +315,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                   return ListTile(
                     title: Text(filteredFriends[index]['user_name']!),
                     onLongPress: () {
-                      _showDeleteFriendDialog(
-                          filteredFriends[index]['user_id']!);
+                      _showActionDialog(filteredFriends[index]['user_name']!);
                     },
                   );
                 },
