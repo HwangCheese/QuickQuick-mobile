@@ -108,19 +108,20 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _checkPermissions() async {
-    var status = await Permission.microphone.status;
+    var status = await Permission.microphone.request();
     if (!status.isGranted) {
       await Permission.microphone.request();
+      print("******* 녹음 권한 받음 *******");
     }
   }
 
   @override
   void initState() {
     super.initState();
+    _checkPermissions();
     _initializeMemoData();
     _initRecorder();
     _videoControllers = [];
-    _checkPermissions();
     _controller.addListener(_handleTextChanged);
   }
 
@@ -435,6 +436,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   Future<void> _initRecorder() async {
     await _recorder.openRecorder();
+    await _recorder
+        .setSubscriptionDuration(Duration(milliseconds: 500)); // 녹음기 초기화
   }
 
   @override
@@ -700,48 +703,35 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     //     return;
     //   }
     // }
-
-    // 권한이 부여되었으므로, 녹음을 시작함.
     try {
-      final Directory tempDir = await getTemporaryDirectory();
-      final String tempPath = tempDir.path;
       _recordedFilePath =
-          '$tempPath/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
-
-      await _recorder.startRecorder(
-        toFile: _recordedFilePath,
-        codec: Codec.aacADTS,
-      );
-      setState(() {
-        _isRecording = true;
-      });
+          '${(await getApplicationDocumentsDirectory()).path}/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
+      await _recorder.startRecorder(toFile: _recordedFilePath);
+      print('Recording started, saving to: $_recordedFilePath');
     } catch (e) {
-      print("Error starting recorder: $e");
+      print('Recording failed to start: $e');
     }
   }
 
   // 녹음 중지
   Future<void> _stopRecording() async {
-    if (_isRecording) {
-      try {
-        await _recorder.stopRecorder();
-        setState(() {
-          _isRecording = false;
-          if (_recordedFilePath != null) {
-            _mediaPaths.add(_recordedFilePath!); // 녹음된 파일을 미디어 리스트에 추가
-          }
-        });
-        print("Recording stopped and saved at $_recordedFilePath");
-      } catch (e) {
-        print("Error stopping recorder: $e");
+    try {
+      final path = await _recorder.stopRecorder();
+      print('Recording stopped, file saved at: $path');
+      final file = File(path!);
+      if (await file.exists()) {
+        print('File length: ${await file.length()} bytes');
+      } else {
+        print('File does not exist');
       }
+    } catch (e) {
+      print('Error stopping the recorder: $e');
     }
   }
 
   // 녹음 파일 재생
   Future<void> _playRecording(String filePath) async {
     try {
-      // 플레이어를 열어야 합니다.
       if (!_player.isOpen()) {
         await _player.openPlayer();
       }
@@ -760,40 +750,44 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _saveAndShareMemo() async {
-    try {
-      // 메모를 서버에 저장합니다.
-      await _saveMemoToServer();
-
-      // 메모 저장이 성공하면 친구 목록을 표시합니다.
-      _showFriendSelectionDialog();
-    } catch (e) {
-      // 저장 중 오류가 발생하면 메시지를 보여줍니다.
-      _showMessage('메모 저장 중 오류가 발생했습니다.');
-    }
+    // 메모 저장은 이제 dialog에서 '전송' 버튼을 눌렀을 때 수행됩니다.
+    _showFriendSelectionDialog();
   }
 
   Future<void> _shareMemoWithFriends(List<String> friendUserIds) async {
-    for (String friendUserId in friendUserIds) {
-      final url = Uri.parse('$SERVER_IP/send-memo');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'sourceUserId': USER_ID,
-          'targetUserId': friendUserId,
-          'memoId': widget.initialMemoId,
-        }),
-      );
+    try {
+      // 먼저 메모를 서버에 저장합니다.
+      await _saveMemoToServer();
 
-      if (response.statusCode != 200) {
-        print('메모 공유 실패: ${response.statusCode}');
-        _showMessage('메모 공유에 실패했습니다.');
-        return;
+      // 친구들에게 메모를 공유합니다.
+      for (String friendUserId in friendUserIds) {
+        final url = Uri.parse('$SERVER_IP/send-memo');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'sourceUserId': USER_ID,
+            'targetUserId': friendUserId,
+            'memoId': widget.initialMemoId,
+          }),
+        );
+
+        if (response.statusCode != 200) {
+          print('메모 공유 실패: ${response.statusCode}');
+          _showMessage('메모 공유에 실패했습니다.');
+          return;
+        }
       }
-    }
 
-    print('메모 공유 성공');
-    _showMessage('메모가 성공적으로 공유되었습니다.');
+      print('메모 공유 성공');
+      _showMessage('메모가 성공적으로 공유되었습니다.');
+
+      // 홈 화면으로 이동
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      // 오류 발생 시 메시지 표시
+      _showMessage('메모 저장 또는 공유 중 오류가 발생했습니다.');
+    }
   }
 
   Future<void> _showFriendSelectionDialog() async {
@@ -802,7 +796,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-                'user_name': friend['friend_name'],
+                'user_name': friend['friend_name_set'],
                 'user_id': friend['friend_id'],
               })
           .toList();
@@ -843,14 +837,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 actions: <Widget>[
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      Navigator.of(context).pop(); // 팝업 닫기
                     },
                     child: Text('취소'),
                   ),
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      _shareMemoWithFriends(selectedFriendIds);
+                      Navigator.of(context).pop(); // 팝업 닫기
+                      _shareMemoWithFriends(
+                          selectedFriendIds); // 메모 저장 후 공유 및 홈 화면으로 이동
                     },
                     child: Text('전송'),
                   ),
