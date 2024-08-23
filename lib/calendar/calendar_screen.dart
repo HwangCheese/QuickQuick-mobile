@@ -4,6 +4,12 @@ import 'package:table_calendar/table_calendar.dart';
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({Key? key}) : super(key: key);
 
+  static void addEvent(BuildContext context, DateTime date, String event) {
+    final _CalendarScreenState? state =
+        context.findAncestorStateOfType<_CalendarScreenState>();
+    state?._addEvent(date, event);
+  }
+
   @override
   _CalendarScreenState createState() => _CalendarScreenState();
 }
@@ -16,11 +22,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    // Temporary event data
     _events = {
       DateTime.utc(2024, 7, 27): ['오후 3시 교수님 미팅', '오후 5시 팀 회의', '오후 10시 회식'],
       DateTime.utc(2024, 7, 28): ['오후 7시 동아리 회식', '오전 2시 개인 공부'],
     };
+  }
+
+  void _addEvent(DateTime date, String event) {
+    setState(() {
+      if (_events[date] != null) {
+        _events[date]!.add(event);
+      } else {
+        _events[date] = [event];
+      }
+    });
   }
 
   List<String> _getEventsForDay(DateTime day) {
@@ -66,9 +81,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 titleCentered: true,
                 leftChevronVisible: true,
                 rightChevronVisible: true,
-                titleTextStyle: TextStyle(fontSize: 23.0), // 연, 월 글씨 크기 설정
-                headerMargin:
-                    const EdgeInsets.only(bottom: 30.0), // 헤더와 날짜 사이 간격
+                titleTextStyle: TextStyle(fontSize: 23.0),
+                headerMargin: const EdgeInsets.only(bottom: 30.0),
               ),
               firstDay: DateTime.utc(2010, 10, 16),
               lastDay: DateTime.utc(2030, 3, 14),
@@ -79,7 +93,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               onDaySelected: (selectedDay, focusedDay) {
                 setState(() {
                   _selectedDay = selectedDay;
-                  _focusedDay = focusedDay; // update `_focusedDay` here as well
+                  _focusedDay = focusedDay;
                 });
               },
               onPageChanged: (focusedDay) {
@@ -96,7 +110,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         height: 7,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.blue, // Marker color
+                          color: Colors.blue,
                         ),
                       ),
                     );
@@ -118,8 +132,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.blue[300],
                   shape: BoxShape.circle,
                 ),
-                cellMargin:
-                    const EdgeInsets.symmetric(vertical: 4.0), // 날짜 셀 간격
+                cellMargin: const EdgeInsets.symmetric(vertical: 4.0),
               ),
             ),
             const SizedBox(height: 20),

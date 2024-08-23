@@ -268,6 +268,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showMenu(BuildContext context, int index) {
+    String memoId = memos[index]['memo_id']; // memoId 가져오기
+
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -283,32 +285,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               ListTile(
-                leading: Icon(Icons.copy),
-                title: Text('복사'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Clipboard.setData(ClipboardData(text: memos[index]['text']));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('메모가 클립보드에 복사되었습니다.')),
-                  );
-                },
-              ),
-              ListTile(
                 leading: Icon(Icons.share),
                 title: Text('공유'),
                 onTap: () {
                   Navigator.pop(context);
-                  _showFriendSelectionDialog();
+                  _showFriendSelectionDialog(memoId); // memoId 전달
                 },
               ),
               ListTile(
                 leading: Icon(Icons.delete),
                 title: Text('삭제'),
                 onTap: () {
-                  String memoId = memos[index]['memo_id'];
                   setState(() {
-                    memos.removeAt(index);
                     _deleteMemoFromServer(memoId);
+                    memos.removeAt(index);
                   });
                   Navigator.pop(context);
                 },
@@ -336,46 +326,68 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _showFriendSelectionDialog() async {
+  Future<void> _showFriendSelectionDialog(String memoId) async {
     final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-                'user_name': friend['friend_name'],
+                'user_name': friend['friend_name_set'],
                 'user_id': friend['friend_id'],
               })
           .toList();
 
+      List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
+
       showDialog(
         context: context,
         builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('친구 선택'),
-            content: Container(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: friends.length,
-                itemBuilder: (context, friendIndex) {
-                  return ListTile(
-                    title: Text(friends[friendIndex]['user_name']!),
-                    onTap: () {
-                      Navigator.pop(context);
-                      //_shareMemoWithFriend(friends[index]['user_id']!, index);
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('친구 선택'),
+                content: Container(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: friends.length,
+                    itemBuilder: (context, index) {
+                      return CheckboxListTile(
+                        title: Text(friends[index]['user_name']!),
+                        value: selectedFriendIds
+                            .contains(friends[index]['user_id']),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              selectedFriendIds.add(friends[index]['user_id']!);
+                            } else {
+                              selectedFriendIds
+                                  .remove(friends[index]['user_id']);
+                            }
+                          });
+                        },
+                      );
                     },
-                  );
-                },
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('취소'),
-              ),
-            ],
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // 팝업 닫기
+                    },
+                    child: Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // 팝업 닫기
+                      _shareMemoWithFriends(
+                          selectedFriendIds, memoId); // memoId 전달
+                    },
+                    child: Text('전송'),
+                  ),
+                ],
+              );
+            },
           );
         },
       );
@@ -384,25 +396,48 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _shareMemoWithFriend(String friendUserId, int memoId) async {
-    final url = Uri.parse('$SERVER_IP/send-memo');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'sourceUserId': USER_ID,
-        'targetUserId': friendUserId,
-        'memo_id': memoId,
-      }),
+  Future<void> _shareMemoWithFriends(
+      List<String> friendUserIds, String memoId) async {
+    if (friendUserIds.isEmpty) {
+      _showMessage('친구를 선택해주세요.');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: CircularProgressIndicator(),
+        );
+      },
     );
 
-    if (response.statusCode == 200) {
-      print('메모 공유 성공');
+    try {
+      for (String friendUserId in friendUserIds) {
+        final url = Uri.parse('$SERVER_IP/send-memo');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'sourceUserId': USER_ID,
+            'targetUserId': friendUserId,
+            'memoId': memoId, // 전달받은 memoId 사용
+          }),
+        );
+
+        if (response.statusCode != 200) {
+          Navigator.of(context).pop();
+          _showMessage('메모 공유 실패: ${response.statusCode}');
+          return;
+        }
+      }
+
+      Navigator.of(context).pop();
       _showMessage('메모가 성공적으로 공유되었습니다.');
-    } else {
-      print('$USER_ID, $friendUserId, $memoId');
-      print('메모 공유 실패: ${response.statusCode}');
-      _showMessage('메모 공유에 실패했습니다.');
+    } catch (e) {
+      Navigator.of(context).pop();
+      _showMessage('메모 공유 중 오류 발생: $e');
     }
   }
 
@@ -580,10 +615,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.select_all),
                 onPressed: _selectAllMemos,
               ),
-              IconButton(
-                icon: Icon(Icons.share),
-                onPressed: _showFriendSelectionDialog,
-              ),
+              // IconButton(
+              //   icon: Icon(Icons.share),
+              //   onPressed: _showFriendSelectionDialog,
+              // ),
               IconButton(
                 icon: Icon(Icons.delete),
                 onPressed: _deleteSelectedMemos,
