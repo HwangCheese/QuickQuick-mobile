@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:googleapis_auth/auth_io.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
@@ -53,7 +56,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   bool _isLoading = true; // 로딩 상태를 추가
   String _translatedText = '';
   String _selectedLanguage = 'ko';
-  final String _textToProcess = '';
+  Timer? _debounce;
+  String _lastProcessedText = '';
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -98,6 +102,88 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  void _onTextChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (_controller.text.isNotEmpty &&
+          _controller.text != _lastProcessedText) {
+        _processText(_controller.text);
+      }
+    });
+  }
+
+  Future<void> _processText(String text) async {
+    final url =
+        'https://language.googleapis.com/v1/documents:analyzeSyntax?key=$apiKey';
+    final requestBody = {
+      'document': {
+        'type': 'PLAIN_TEXT',
+        'content': text,
+      },
+      'encodingType': 'UTF8',
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        final tokens = responseBody['tokens'];
+        final spacedText = _generateSpacedText(tokens);
+
+        if (text == _controller.text) {
+          // 현재 입력된 텍스트와 일치하는지 확인
+          setState(() {
+            _lastProcessedText = spacedText;
+            _controller.value = _controller.value.copyWith(
+              text: spacedText,
+              selection: TextSelection.fromPosition(
+                TextPosition(offset: spacedText.length),
+              ),
+            );
+          });
+        }
+      } else {
+        print('Failed to analyze text: ${response.body}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  String _generateSpacedText(List<dynamic> tokens) {
+    StringBuffer spacedText = StringBuffer();
+
+    for (int i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      var text = token['text']['content'];
+      var tag = token['partOfSpeech']['tag'];
+
+      spacedText.write(text);
+
+      // 명사, 동사, 형용사 다음에 공백 추가
+      if (tag == 'NOUN' || tag == 'VERB' || tag == 'ADJ') {
+        spacedText.write(' ');
+      }
+
+      // 다음 단어가 명사인 경우 공백 추가
+      if (i < tokens.length - 1) {
+        var nextToken = tokens[i + 1];
+        var nextTag = nextToken['partOfSpeech']['tag'];
+
+        if (nextTag == 'NOUN' || nextTag == 'VERB' || nextTag == 'ADJ') {
+          spacedText.write(' ');
+        }
+      }
+    }
+
+    return spacedText.toString().trim();
+  }
+
   String getColorName(Color color) {
     // colorMap의 value 중 일치하는 Color가 있는지 확인
     String colorKey = colorMap.entries
@@ -122,7 +208,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _initializeMemoData();
     _initRecorder();
     _videoControllers = [];
+    _controller.addListener(_onTextChanged);
     _controller.addListener(_handleTextChanged);
+    _controller.addListener(() {
+      if (_controller.text.isNotEmpty) {
+        _processText(_controller.text);
+      }
+    });
   }
 
   void _handleTextChanged() {
@@ -446,6 +538,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _controller.removeListener(_handleTextChanged);
     _controller.dispose();
     _focusNode.dispose();
+    _debounce?.cancel();
     _videoControllers.forEach((controller) {
       controller?.dispose();
     });
@@ -1244,6 +1337,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                       )
                                     : TextField(
                                         controller: _controller,
+                                        keyboardType: TextInputType.multiline,
                                         maxLines: null,
                                         focusNode: _focusNode,
                                         decoration: InputDecoration(
