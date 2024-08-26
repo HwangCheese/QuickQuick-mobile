@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
@@ -15,6 +16,7 @@ import 'dart:typed_data';
 import 'dart:math';
 import '../../globals.dart';
 import '../calendar/calendar_screen.dart';
+import 'media_viewer.dart';
 
 class WriteMemoScreen extends StatefulWidget {
   final Color? initialColor;
@@ -38,7 +40,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _picker = ImagePicker();
   final FlutterSoundPlayer _player = FlutterSoundPlayer();
-  //final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   String? _audioPath;
   bool _isRecording = false;
   List<String> _mediaPaths = [];
@@ -57,6 +58,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final String _textToProcess = '';
   bool _shouldShowSummaryRecommendation = false;
   final Record _recorder = Record();
+  final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
+  String _transcription = ''; // 트랜스크립션 결과를 저장할 변수
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -451,6 +454,91 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  Future<String> convertM4aToWav(String m4aFilePath) async {
+    try {
+      // 출력될 wav 파일의 경로를 설정합니다.
+      final directory = await getTemporaryDirectory();
+      final wavFilePath =
+          '${directory.path}/converted_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+      // FFmpeg 명령어를 사용하여 m4a를 모노 wav로 변환합니다.
+      final arguments = ['-i', m4aFilePath, '-ac', '1', wavFilePath];
+
+      final int result = await _flutterFFmpeg.executeWithArguments(arguments);
+
+      if (result == 0) {
+        print('Conversion successful');
+        return wavFilePath; // 변환된 wav 파일의 경로를 반환합니다.
+      } else {
+        print('Conversion failed with result $result');
+        throw Exception('Failed to convert m4a to wav');
+      }
+    } catch (e) {
+      print('Error occurred: $e');
+      throw Exception('Failed to convert m4a to wav');
+    }
+  }
+
+  Future<void> _transcribeM4aFile(String m4aFilePath) async {
+    try {
+      final wavFilePath = await convertM4aToWav(m4aFilePath);
+      await _transcribeAudio(wavFilePath);
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  Future<void> _transcribeAudio(String filePath) async {
+    final url = 'https://speech.googleapis.com/v1/speech:recognize?key=$apiKey';
+
+    try {
+      // 오디오 파일을 base64로 인코딩
+      final bytes = File(filePath).readAsBytesSync();
+      final audioContent = base64Encode(bytes);
+
+      // Google Cloud Speech-to-Text API 요청 설정
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'config': {
+            'encoding': 'LINEAR16',
+            'sampleRateHertz': 44100,
+            'languageCode': 'ko-KR', // 언어 코드 설정
+          },
+          'audio': {
+            'content': audioContent,
+          },
+        }),
+      );
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final results = data['results'];
+        if (results != null && results.isNotEmpty) {
+          final transcription = results[0]['alternatives'][0]['transcript'];
+          setState(() {
+            _transcription = transcription ?? 'No transcription available';
+          });
+        } else {
+          setState(() {
+            _transcription = 'No transcription available';
+          });
+        }
+      } else {
+        throw Exception('Failed to transcribe audio');
+      }
+    } catch (e) {
+      print('Error occurred: $e');
+      setState(() {
+        _transcription = 'Failed to transcribe audio';
+      });
+    }
+  }
+
   Future<void> _deleteMemoFromServer(String memoId) async {
     if (memoId == null) return;
 
@@ -755,25 +843,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
 
     _mediaPaths.add(_audioPath!);
-  }
-
-  // 녹음 파일 재생
-  Future<void> _playRecording(String filePath) async {
-    try {
-      if (!_player.isOpen()) {
-        await _player.openPlayer();
-      }
-
-      await _player.startPlayer(
-        fromURI: filePath,
-        whenFinished: () {
-          setState(() {
-            print("Playback finished");
-          });
-        },
-      );
-    } catch (e) {
-      print("Error playing recording: $e");
+    if (_audioPath != null) {
+      _transcribeM4aFile(_audioPath!);
     }
   }
 
@@ -1029,11 +1100,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     return GestureDetector(
       onTap: () {
-        if (isAudio) {
-          _playRecording(filePath);
-        } else {
-          _toggleMediaSelection(index);
-        }
+        showDialog(
+          context: context,
+          builder: (context) => MediaViewer(
+            filePath: filePath,
+            onDelete: () {
+              _removeMedia(index); // 미디어 삭제
+            },
+          ),
+        );
       },
       child: Stack(
         children: [
@@ -1328,6 +1403,29 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           ),
                           child: Text(
                             _summary,
+                            style:
+                                TextStyle(fontSize: 16.0, color: Colors.black),
+                          ),
+                        ),
+                      if (_transcription.isNotEmpty) // 트랜스크립션 내용이 있을 때만 표시
+                        SizedBox(height: 20.0),
+                      if (_transcription.isNotEmpty)
+                        Container(
+                          width: screenWidth * 0.9,
+                          padding: EdgeInsets.all(16.0),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8.0,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            _transcription,
                             style:
                                 TextStyle(fontSize: 16.0, color: Colors.black),
                           ),
