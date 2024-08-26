@@ -22,6 +22,7 @@ dependencies:
   file_picker: ^8.0.6
   flutter_sound: ^9.2.13
   flutter_sound_platform_interface: ^9.2.15
+  audioplayers: ^5.2.0
   path_provider: ^2.0.9
   permission_handler: ^10.0.0
   envied: ^0.5.4+1
@@ -30,6 +31,9 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   video_player: ^2.2.15
   geocoding: ^2.0.5
+  flutter_document_picker: ^5.0.0
+  file_saver: ^0.2.14
+  record: ^4.0.0
 
 dev_dependencies:
   flutter_test:
