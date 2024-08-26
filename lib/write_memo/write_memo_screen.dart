@@ -1215,15 +1215,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           actions: <Widget>[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              child: Wrap(
+                spacing: 16.0, // 버튼 간의 간격을 일정하게 유지
                 children: <Widget>[
                   IconButton(
                     iconSize: 30.0,
                     icon: const Icon(Icons.attach_file),
                     onPressed: _pickImageOrFile,
                   ),
-                  SizedBox(width: 16.0),
                   IconButton(
                     iconSize: 30.0,
                     icon: _isRecording
@@ -1231,17 +1230,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         : Icon(CupertinoIcons.mic),
                     onPressed: _isRecording ? _stopRecording : _startRecording,
                   ),
-                  if (_filePath != null)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                    ),
-                  SizedBox(width: 16.0),
                   IconButton(
                     iconSize: 30.0,
                     icon: const Icon(Icons.edit_note),
                     onPressed: _getSummary,
                   ),
-                  SizedBox(width: 16.0),
                   IconButton(
                     iconSize: 30.0,
                     icon: const Icon(Icons.translate),
@@ -1271,7 +1264,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                     },
                     tooltip: 'Translate Text',
                   ),
-                  SizedBox(width: 16.0),
                   IconButton(
                     iconSize: 30.0,
                     icon: Icon(Icons.send_rounded, color: Colors.black),
