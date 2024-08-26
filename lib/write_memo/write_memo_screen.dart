@@ -990,6 +990,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  void _removeFile(int index) {
+    setState(() {
+      _filePaths.removeAt(index);
+    });
+  }
+
   void _toggleMediaSelection(int index) {
     setState(() {
       if (_selectedMediaIndex == index) {
@@ -1027,15 +1033,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   // 파일 아이템 UI
-  Widget _buildFileTile(String filePath) {
+  Widget _buildFileTile(String filePath, int index) {
     final fileName = filePath.split('/').last;
     final isPdf = filePath.endsWith('.pdf');
 
     return GestureDetector(
       onTap: () {
         if (isPdf) {
-          // PDF 파일도 MediaViewer로 이동
-          _openMediaViewer(filePath);
+          _openMediaViewer(filePath, index, true);
         } else {
           _downloadFile(filePath, fileName);
         }
@@ -1050,7 +1055,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         child: Row(
           children: [
             Icon(isPdf ? Icons.picture_as_pdf : Icons.insert_drive_file,
-                color: isPdf ? Colors.red : Colors.grey[700]), // PDF 파일 아이콘
+                color: isPdf ? Colors.red : Colors.grey[700]),
             SizedBox(width: 16.0),
             Expanded(
               child: Text(
@@ -1105,7 +1110,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  Future<void> _openMediaViewer(String filePath) async {
+  Future<void> _openMediaViewer(String filePath, int index, bool isFile) async {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1113,7 +1118,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           filePath: filePath,
           onDelete: () {
             setState(() {
-              _filePaths.remove(filePath);
+              if (isFile) {
+                _removeFile(index);
+              } else {
+                _removeMedia(index);
+              }
             });
           },
         ),
@@ -1131,7 +1140,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     return GestureDetector(
       onTap: () {
-        _openMediaViewer(filePath);
+        _openMediaViewer(filePath, index, false);
       },
       child: Stack(
         children: [
@@ -1324,10 +1333,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                               Padding(
                                 padding: const EdgeInsets.all(8.0),
                                 child: Column(
-                                  children: _filePaths
-                                      .map((filePath) =>
-                                          _buildFileTile(filePath))
-                                      .toList(),
+                                  children:
+                                      List.generate(_filePaths.length, (index) {
+                                    return _buildFileTile(_filePaths[index],
+                                        index + _mediaPaths.length);
+                                  }),
                                 ),
                               ),
                             Expanded(
@@ -1368,40 +1378,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           ],
                         ),
                       ),
-                      if (_shouldShowSummaryRecommendation)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          margin: EdgeInsets.only(top: 10.0),
-                          decoration: BoxDecoration(
-                            color: Colors.yellow[100],
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '텍스트가 길어졌네요! 요약을 해보시겠어요?',
-                                style: TextStyle(
-                                    fontSize: 16.0, color: Colors.black),
-                              ),
-                              TextButton(
-                                onPressed: _getSummary,
-                                child: Text(
-                                  '요약하기',
-                                  style: TextStyle(color: Colors.blue),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
                         SizedBox(height: 20.0),
                       if (_summary.isNotEmpty)
