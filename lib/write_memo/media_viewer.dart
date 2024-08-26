@@ -138,7 +138,7 @@ class _MediaViewerState extends State<MediaViewer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black.withOpacity(0.7),
       body: GestureDetector(
         onTap: () => Navigator.of(context).pop(),
         child: Stack(
@@ -290,36 +290,41 @@ class _MediaViewerState extends State<MediaViewer> {
   }
 
   Widget _buildPdfViewer() {
-    return _isReady
-        ? PDFView(
-            filePath: widget.filePath,
-            enableSwipe: true,
-            swipeHorizontal: true,
-            autoSpacing: false,
-            pageFling: false,
-            onRender: (_pages) {
-              setState(() {
-                _totalPages = _pages!;
-                _isReady = true;
-              });
-            },
-            onViewCreated: (PDFViewController pdfViewController) {
-              _pdfViewController = pdfViewController;
-            },
-            onPageChanged: (int? page, int? total) {
-              setState(() {
-                _currentPage = page ?? 0;
-              });
-            },
-            onError: (error) {
-              print("Error loading PDF: $error");
-            },
-            onPageError: (page, error) {
-              print("Page error on page $page: $error");
-            },
-          )
-        : Center(
-            child: CircularProgressIndicator(),
-          );
+    return PDFView(
+      filePath: widget.filePath,
+      enableSwipe: true,
+      swipeHorizontal: false, // 위아래로 스크롤하게 설정
+      autoSpacing: true,
+      pageFling: true, // 자연스러운 스크롤을 위해 설정
+      fitEachPage: false, // 페이지가 전체 화면에 맞도록 조정
+      fitPolicy: FitPolicy.BOTH, // 페이지를 가로와 세로 모두 맞춤
+      onRender: (_pages) {
+        setState(() {
+          _totalPages = _pages ?? 0;
+          _isReady = true;
+        });
+      },
+      onViewCreated: (PDFViewController pdfViewController) {
+        _pdfViewController = pdfViewController;
+        _pdfViewController!.setPage(0); // 첫 번째 페이지로 설정
+      },
+      onPageChanged: (int? page, int? total) {
+        setState(() {
+          _currentPage = page ?? 0;
+        });
+      },
+      onError: (error) {
+        print("Error loading PDF: $error");
+        setState(() {
+          _isReady = false;
+        });
+      },
+      onPageError: (page, error) {
+        print("Page error on page $page: $error");
+        setState(() {
+          _isReady = false;
+        });
+      },
+    );
   }
 }
