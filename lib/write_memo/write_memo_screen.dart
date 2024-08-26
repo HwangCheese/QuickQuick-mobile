@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
@@ -57,14 +54,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   bool _isLoading = true; // 로딩 상태를 추가
   String _translatedText = '';
   String _selectedLanguage = 'ko';
-<<<<<<< Updated upstream
-  Timer? _debounce;
-  String _lastProcessedText = '';
-=======
   final String _textToProcess = '';
   bool _shouldShowSummaryRecommendation = false;
   final Record _recorder = Record();
->>>>>>> Stashed changes
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -109,88 +101,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  void _onTextChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (_controller.text.isNotEmpty &&
-          _controller.text != _lastProcessedText) {
-        _processText(_controller.text);
-      }
-    });
-  }
-
-  Future<void> _processText(String text) async {
-    final url =
-        'https://language.googleapis.com/v1/documents:analyzeSyntax?key=$apiKey';
-    final requestBody = {
-      'document': {
-        'type': 'PLAIN_TEXT',
-        'content': text,
-      },
-      'encodingType': 'UTF8',
-    };
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestBody),
-      );
-
-      if (response.statusCode == 200) {
-        final responseBody = jsonDecode(response.body);
-        final tokens = responseBody['tokens'];
-        final spacedText = _generateSpacedText(tokens);
-
-        if (text == _controller.text) {
-          // 현재 입력된 텍스트와 일치하는지 확인
-          setState(() {
-            _lastProcessedText = spacedText;
-            _controller.value = _controller.value.copyWith(
-              text: spacedText,
-              selection: TextSelection.fromPosition(
-                TextPosition(offset: spacedText.length),
-              ),
-            );
-          });
-        }
-      } else {
-        print('Failed to analyze text: ${response.body}');
-      }
-    } catch (e) {
-      print('Error: $e');
-    }
-  }
-
-  String _generateSpacedText(List<dynamic> tokens) {
-    StringBuffer spacedText = StringBuffer();
-
-    for (int i = 0; i < tokens.length; i++) {
-      var token = tokens[i];
-      var text = token['text']['content'];
-      var tag = token['partOfSpeech']['tag'];
-
-      spacedText.write(text);
-
-      // 명사, 동사, 형용사 다음에 공백 추가
-      if (tag == 'NOUN' || tag == 'VERB' || tag == 'ADJ') {
-        spacedText.write(' ');
-      }
-
-      // 다음 단어가 명사인 경우 공백 추가
-      if (i < tokens.length - 1) {
-        var nextToken = tokens[i + 1];
-        var nextTag = nextToken['partOfSpeech']['tag'];
-
-        if (nextTag == 'NOUN' || nextTag == 'VERB' || nextTag == 'ADJ') {
-          spacedText.write(' ');
-        }
-      }
-    }
-
-    return spacedText.toString().trim();
-  }
-
   String getColorName(Color color) {
     // colorMap의 value 중 일치하는 Color가 있는지 확인
     String colorKey = colorMap.entries
@@ -215,13 +125,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _initializeMemoData();
     _initRecorder();
     _videoControllers = [];
-    _controller.addListener(_onTextChanged);
     _controller.addListener(_handleTextChanged);
-    _controller.addListener(() {
-      if (_controller.text.isNotEmpty) {
-        _processText(_controller.text);
-      }
-    });
   }
 
   void _handleTextChanged() {
@@ -570,7 +474,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _controller.removeListener(_handleTextChanged);
     _controller.dispose();
     _focusNode.dispose();
-    _debounce?.cancel();
     _videoControllers.forEach((controller) {
       controller?.dispose();
     });
@@ -851,14 +754,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       _isRecording = false;
     });
 
-    final file = File(_audioPath!);
-    final fileSize = await file.length();
-
-    if (fileSize > 0) {
-      print("Recording saved successfully: $_audioPath");
-    } else {
-      print("Recording file is empty");
-    }
+    _mediaPaths.add(_audioPath!);
   }
 
   // 녹음 파일 재생
@@ -1125,6 +1021,67 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  Widget _buildMediaTile(String filePath, int index) {
+    final isVideo = filePath.endsWith('.mp4') ||
+        filePath.endsWith('.MOV') ||
+        filePath.endsWith('.mov');
+    final isAudio = filePath.endsWith('.m4a') || filePath.endsWith('.aac');
+
+    return GestureDetector(
+      onTap: () {
+        if (isAudio) {
+          _playRecording(filePath);
+        } else {
+          _toggleMediaSelection(index);
+        }
+      },
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+            child: AspectRatio(
+              aspectRatio: 1.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    border: Border.all(
+                      color: isAudio ? Colors.blue : Colors.transparent,
+                      width: 2.0,
+                    ),
+                  ),
+                  child: isVideo
+                      ? _videoControllers[index] != null &&
+                              _videoControllers[index]!.value.isInitialized
+                          ? VideoPlayer(_videoControllers[index]!)
+                          : Center(child: CircularProgressIndicator())
+                      : isAudio
+                          ? Icon(Icons.audiotrack,
+                              size: 50, color: Colors.black)
+                          : Image.file(File(filePath), fit: BoxFit.cover),
+                ),
+              ),
+            ),
+          ),
+          if (_selectedMediaIndex == index)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () => _removeMedia(index),
+                child: CircleAvatar(
+                  backgroundColor: Colors.grey,
+                  radius: 16,
+                  child: Icon(Icons.close, size: 16, color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1265,84 +1222,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   itemCount:
                                       _mediaPaths.length, // 미디어 리스트 수 만큼 표시
                                   itemBuilder: (context, index) {
-                                    final filePath = _mediaPaths[index];
-                                    final isVideo = filePath.endsWith('.mp4') ||
-                                        filePath.endsWith('.MOV');
-                                    final isAudio = filePath.endsWith('.aac');
-
-                                    return GestureDetector(
-                                      onTap: () {
-                                        if (isAudio) {
-                                          _playRecording(filePath);
-                                        } else {
-                                          _toggleMediaSelection(index);
-                                        }
-                                      },
-                                      child: Stack(
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8.0, horizontal: 8.0),
-                                            child: AspectRatio(
-                                              aspectRatio: 1.0,
-                                              child: ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(16.0),
-                                                child: Container(
-                                                  decoration: BoxDecoration(
-                                                    border: Border.all(
-                                                      color: isAudio
-                                                          ? Colors.blue
-                                                          : Colors
-                                                              .transparent, // 오디오 파일에만 테두리 추가
-                                                      width: 2.0,
-                                                    ),
-                                                  ),
-                                                  child: isVideo
-                                                      ? _videoControllers[index] !=
-                                                                  null &&
-                                                              _videoControllers[
-                                                                      index]!
-                                                                  .value
-                                                                  .isInitialized
-                                                          ? VideoPlayer(
-                                                              _videoControllers[
-                                                                  index]!)
-                                                          : Center(
-                                                              child:
-                                                                  CircularProgressIndicator())
-                                                      : isAudio
-                                                          ? Icon(
-                                                              Icons.audiotrack,
-                                                              size:
-                                                                  50) // 오디오 파일은 아이콘으로 표시
-                                                          : Image.file(
-                                                              File(filePath),
-                                                              fit:
-                                                                  BoxFit.cover),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          if (_selectedMediaIndex == index)
-                                            Positioned(
-                                              top: 8,
-                                              right: 8,
-                                              child: GestureDetector(
-                                                onTap: () =>
-                                                    _removeMedia(index),
-                                                child: CircleAvatar(
-                                                  backgroundColor: Colors.grey,
-                                                  radius: 16,
-                                                  child: Icon(Icons.close,
-                                                      size: 16,
-                                                      color: Colors.white),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    );
+                                    return _buildMediaTile(
+                                        _mediaPaths[index], index);
                                   },
                                 ),
                               ),
@@ -1375,7 +1256,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                       )
                                     : TextField(
                                         controller: _controller,
-                                        keyboardType: TextInputType.multiline,
                                         maxLines: null,
                                         focusNode: _focusNode,
                                         onChanged: (text) {
