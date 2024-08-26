@@ -613,17 +613,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       request.fields['data_txt'] = "";
     }
 
+    print(_mediaPaths);
     // Add user-selected media files
     for (var filePath in _mediaPaths) {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
     }
 
     // Convert fetched images to files and add them to the request
-    for (var imageData in _fetchedImages) {
-      final imageFile = await _saveImageToFile(imageData);
-      request.files
-          .add(await http.MultipartFile.fromPath('files', imageFile.path));
-    }
+    // for (var imageData in _fetchedImages) {
+    //   final imageFile = await _saveImageToFile(imageData);
+    //   request.files
+    //       .add(await http.MultipartFile.fromPath('files', imageFile.path));
+    // }
 
     for (var filePath in _filePaths) {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
@@ -1028,30 +1029,42 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   // 파일 아이템 UI
   Widget _buildFileTile(String filePath) {
     final fileName = filePath.split('/').last;
+    final isPdf = filePath.endsWith('.pdf');
 
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 8.0),
-      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(58.0),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.insert_drive_file, color: Colors.grey[700]), // 파일 아이콘
-          SizedBox(width: 16.0),
-          Expanded(
-            child: Text(
-              fileName,
-              style: TextStyle(color: Colors.black, fontSize: 16.0),
-              overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      onTap: () {
+        if (isPdf) {
+          // PDF 파일도 MediaViewer로 이동
+          _openMediaViewer(filePath);
+        } else {
+          _downloadFile(filePath, fileName);
+        }
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8.0),
+        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(58.0),
+        ),
+        child: Row(
+          children: [
+            Icon(isPdf ? Icons.picture_as_pdf : Icons.insert_drive_file,
+                color: isPdf ? Colors.red : Colors.grey[700]), // PDF 파일 아이콘
+            SizedBox(width: 16.0),
+            Expanded(
+              child: Text(
+                fileName,
+                style: TextStyle(color: Colors.black, fontSize: 16.0),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.download, color: Colors.grey),
-            onPressed: () => _downloadFile(filePath, fileName),
-          ),
-        ],
+            IconButton(
+              icon: Icon(Icons.download, color: Colors.grey),
+              onPressed: () => _downloadFile(filePath, fileName),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1092,23 +1105,33 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  Future<void> _openMediaViewer(String filePath) async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MediaViewer(
+          filePath: filePath,
+          onDelete: () {
+            setState(() {
+              _filePaths.remove(filePath);
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  // 이 함수는 _buildMediaTile에서도 사용됩니다.
   Widget _buildMediaTile(String filePath, int index) {
     final isVideo = filePath.endsWith('.mp4') ||
         filePath.endsWith('.MOV') ||
         filePath.endsWith('.mov');
     final isAudio = filePath.endsWith('.m4a') || filePath.endsWith('.aac');
+    final isPdf = filePath.endsWith('.pdf');
 
     return GestureDetector(
       onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => MediaViewer(
-            filePath: filePath,
-            onDelete: () {
-              _removeMedia(index); // 미디어 삭제
-            },
-          ),
-        );
+        _openMediaViewer(filePath);
       },
       child: Stack(
         children: [
@@ -1134,7 +1157,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       : isAudio
                           ? Icon(Icons.audiotrack,
                               size: 50, color: Colors.black)
-                          : Image.file(File(filePath), fit: BoxFit.cover),
+                          : isPdf
+                              ? Icon(Icons.picture_as_pdf,
+                                  size: 50, color: Colors.red)
+                              : Image.file(File(filePath), fit: BoxFit.cover),
                 ),
               ),
             ),
