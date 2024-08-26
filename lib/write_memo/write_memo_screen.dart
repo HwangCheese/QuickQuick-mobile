@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -39,8 +41,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _picker = ImagePicker();
   final FlutterSoundPlayer _player = FlutterSoundPlayer();
-  final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
-  String? _recordedFilePath;
+  //final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  String? _audioPath;
   bool _isRecording = false;
   List<String> _mediaPaths = [];
   String? _filePath;
@@ -55,8 +57,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   bool _isLoading = true; // 로딩 상태를 추가
   String _translatedText = '';
   String _selectedLanguage = 'ko';
+<<<<<<< Updated upstream
   Timer? _debounce;
   String _lastProcessedText = '';
+=======
+  final String _textToProcess = '';
+  bool _shouldShowSummaryRecommendation = false;
+  final Record _recorder = Record();
+>>>>>>> Stashed changes
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -220,11 +228,36 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     String text = _controller.text;
     List<String> lines = text.split('\n');
 
+    // 요약 추천 로직
+    if (lines.length > 10 && !_shouldShowSummaryRecommendation) {
+      setState(() {
+        _shouldShowSummaryRecommendation = true;
+      });
+    } else if (lines.length <= 10 && _shouldShowSummaryRecommendation) {
+      setState(() {
+        _shouldShowSummaryRecommendation = false;
+      });
+    }
+
     for (String line in lines) {
       if (_isEventLine(line)) {
         _showEventConfirmationDialog(line);
         break;
       }
+    }
+  }
+
+  void _checkAndRecommendSummary() {
+    int characterCount = _controller.text.length;
+
+    if (characterCount >= 300 && !_shouldShowSummaryRecommendation) {
+      setState(() {
+        _shouldShowSummaryRecommendation = true;
+      });
+    } else if (characterCount < 300 && _shouldShowSummaryRecommendation) {
+      setState(() {
+        _shouldShowSummaryRecommendation = false;
+      });
     }
   }
 
@@ -268,7 +301,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       int month = int.parse(match.group(1)!);
       int day = int.parse(match.group(2)!);
       String eventDescription = match.group(3)!;
-      DateTime eventDate = DateTime(DateTime.now().year, month, day);
+
+      // 연도를 2024로 고정
+      DateTime eventDate = DateTime(2024, month, day);
 
       // 캘린더에 이벤트 추가
       CalendarScreen.addEvent(context, eventDate, eventDescription);
@@ -526,14 +561,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _initRecorder() async {
-    await _recorder.openRecorder();
-    await _recorder
-        .setSubscriptionDuration(Duration(milliseconds: 500)); // 녹음기 초기화
+    await _recorder.isEncoderSupported(AudioEncoder.aacLc);
   }
 
   @override
   void dispose() {
-    _recorder.closeRecorder();
+    _recorder.dispose();
     _controller.removeListener(_handleTextChanged);
     _controller.dispose();
     _focusNode.dispose();
@@ -795,29 +828,36 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     //     return;
     //   }
     // }
-    try {
-      _recordedFilePath =
-          '${(await getApplicationDocumentsDirectory()).path}/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
-      await _recorder.startRecorder(toFile: _recordedFilePath);
-      print('Recording started, saving to: $_recordedFilePath');
-    } catch (e) {
-      print('Recording failed to start: $e');
-    }
+    Directory appDocDir = await getApplicationDocumentsDirectory();
+    String filePath =
+        '${appDocDir.path}/memo_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    await _recorder.start(
+      path: filePath,
+      encoder: AudioEncoder.aacLc,
+      bitRate: 128000,
+      samplingRate: 44100,
+    );
+    setState(() {
+      _isRecording = true;
+      _audioPath = filePath;
+    });
   }
 
   // 녹음 중지
   Future<void> _stopRecording() async {
-    try {
-      final path = await _recorder.stopRecorder();
-      print('Recording stopped, file saved at: $path');
-      final file = File(path!);
-      if (await file.exists()) {
-        print('File length: ${await file.length()} bytes');
-      } else {
-        print('File does not exist');
-      }
-    } catch (e) {
-      print('Error stopping the recorder: $e');
+    await _recorder.stop();
+    setState(() {
+      _isRecording = false;
+    });
+
+    final file = File(_audioPath!);
+    final fileSize = await file.length();
+
+    if (fileSize > 0) {
+      print("Recording saved successfully: $_audioPath");
+    } else {
+      print("Recording file is empty");
     }
   }
 
@@ -978,7 +1018,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         _videoControllers[index]?.dispose();
         _videoControllers.removeAt(index);
       }
-      _recorder.closeRecorder();
       _selectedMediaIndex = null;
     });
   }
@@ -1339,6 +1378,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                         keyboardType: TextInputType.multiline,
                                         maxLines: null,
                                         focusNode: _focusNode,
+                                        onChanged: (text) {
+                                          _checkAndRecommendSummary(); // 텍스트가 변경될 때마다 요약 추천 체크
+                                        },
                                         decoration: InputDecoration(
                                           border: InputBorder.none,
                                           hintText: '메모를 입력하세요...',
@@ -1353,6 +1395,40 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           ],
                         ),
                       ),
+                      if (_shouldShowSummaryRecommendation)
+                        Container(
+                          width: screenWidth * 0.9,
+                          padding: EdgeInsets.all(16.0),
+                          margin: EdgeInsets.only(top: 10.0),
+                          decoration: BoxDecoration(
+                            color: Colors.yellow[100],
+                            borderRadius: BorderRadius.circular(16.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8.0,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '텍스트가 길어졌네요! 요약을 해보시겠어요?',
+                                style: TextStyle(
+                                    fontSize: 16.0, color: Colors.black),
+                              ),
+                              TextButton(
+                                onPressed: _getSummary,
+                                child: Text(
+                                  '요약하기',
+                                  style: TextStyle(color: Colors.blue),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
                         SizedBox(height: 20.0),
                       if (_summary.isNotEmpty)
