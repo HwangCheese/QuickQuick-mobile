@@ -273,6 +273,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 _isMediaSelected = true;
               });
             }
+          } else if (item['format'] == 'm4a' || item['format'] == 'aac') {
+            final audioPath = await _getAudio(item['data_id']);
+            if (audioPath != null) {
+              setState(() {
+                _mediaPaths.add(audioPath);
+                _isMediaSelected = true;
+              });
+            }
           } else {
             // 파일 포맷이 텍스트, 비디오, 이미지, 오디오가 아닌 경우
             final fileData = await _getFile(item['data_id']);
@@ -296,6 +304,28 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<String?> _getAudio(String dataId) async {
+    final url = Uri.parse("$SERVER_IP/data/$dataId/file");
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // 서버로부터 받은 오디오 파일을 로컬에 저장한 후 경로를 반환
+        final directory = await getTemporaryDirectory();
+        final audioPath =
+            '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.m4a';
+        final audioFile = File(audioPath);
+        await audioFile.writeAsBytes(response.bodyBytes);
+        return audioPath;
+      } else {
+        print('Failed to load audio: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('오디오 불러오기 실패: $e');
+      return null;
     }
   }
 
@@ -844,9 +874,38 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
 
     _mediaPaths.add(_audioPath!);
+
+    // 녹음이 완료된 후 다이얼로그 표시
     if (_audioPath != null) {
-      _transcribeM4aFile(_audioPath!);
+      _showTranscriptionDialog(_audioPath!);
     }
+  }
+
+  void _showTranscriptionDialog(String audioPath) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('음성 인식'),
+          content: Text('음성 인식을 시작하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+              },
+              child: Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+                _transcribeM4aFile(audioPath); // 트랜스크립션 수행
+              },
+              child: Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _saveAndShareMemo() async {
