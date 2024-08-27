@@ -134,11 +134,10 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             if (snapshot.hasData) {
+              String generatedTitle = generateTitle(snapshot.data!);
               return Text(
-                snapshot.data!,
-                style: TextStyle(fontSize: 16.0),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+                generatedTitle, // 제목을 표시
+                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
               );
             } else {
               return Text('데이터를 불러올 수 없습니다.');
@@ -265,6 +264,50 @@ class _HomeScreenState extends State<HomeScreen> {
       print('비디오 불러오기 실패: $e');
       return null;
     }
+  }
+
+  // 제목 생성 함수
+  String generateTitle(String text) {
+    List<String> keyPhrases = extractKeyPhrases(text);
+
+    // 불용어 리스트를 정의합니다.
+    List<String> stopWords = [
+      "이",
+      "그",
+      "저",
+      "은",
+      "는",
+      "이",
+      "가",
+      "을",
+      "를",
+      "에",
+      "의",
+      "과",
+      "와"
+    ];
+
+    // 키워드에서 중요하지 않은 단어들을 제거하고 중요한 단어들을 조합하여 제목을 생성합니다.
+    List<String> importantWords =
+        keyPhrases.where((word) => !stopWords.contains(word)).take(3).toList();
+
+    // 중요한 단어들을 조합하여 제목을 생성합니다.
+    String title = importantWords.join(' ');
+
+    // 제목이 15자보다 길다면 15자까지 자릅니다.
+    if (title.length > 15) {
+      title = title.substring(0, 15);
+    }
+
+    return title;
+  }
+
+  List<String> extractKeyPhrases(String text) {
+    // 예시: 간단한 키워드 추출 (실제 로직은 더욱 복잡할 수 있습니다)
+    List<String> words = text.split(RegExp(r'\s+'));
+    List<String> keyPhrases = words.where((word) => word.length > 1).toList();
+
+    return keyPhrases;
   }
 
   void _showMenu(BuildContext context, int index) {
