@@ -35,6 +35,7 @@ dependencies:
   file_saver: ^0.2.14
   record: ^4.0.0
   flutter_ffmpeg: ^0.4.0
+  flutter_pdfview: ^1.2.7
 
 dev_dependencies:
   flutter_test:
@@ -46,6 +47,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: IBMPlexSansKR
+      fonts:
+        - asset: assets/fonts/IBMPlexSansKR-Light.ttf
 
   assets:
     - assets/images/
