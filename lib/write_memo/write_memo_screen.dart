@@ -622,20 +622,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       return;
     }
 
-    widget.initialMemoId ??= _generateRandomId();
+    widget.initialMemoId ??= _generateRandomId(); // 랜덤 메모 ID 생성
+    String generatedTitle = generateTitle(_controller.text);
+    print('메모 제목: $generatedTitle');
 
     var url = Uri.parse('$SERVER_IP/memo');
     var request = http.MultipartRequest('POST', url);
 
     request.fields['userId'] = USER_ID;
-    request.fields['isOpen'] = '1'; // Assuming the memo is public
     request.fields['theme'] =
         getColorName(_backgroundColor); // Color를 key로 변환하여 저장
-    request.fields['posX'] = '100'; // Example position and size
+    request.fields['posX'] = '100'; // 위치, 크기 예시
     request.fields['posY'] = '100';
     request.fields['width'] = '400';
     request.fields['height'] = '300';
     request.fields['memo_id'] = widget.initialMemoId!;
+    request.fields['title'] = generatedTitle;
 
     if (_controller.text.isNotEmpty) {
       request.fields['data_txt'] = _controller.text;
@@ -1053,6 +1055,50 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     setState(() {
       _filePaths.removeAt(index);
     });
+  }
+
+  // 제목 생성 함수
+  String generateTitle(String text) {
+    List<String> keyPhrases = extractKeyPhrases(text);
+
+    // 불용어 리스트를 정의합니다.
+    List<String> stopWords = [
+      "이",
+      "그",
+      "저",
+      "은",
+      "는",
+      "이",
+      "가",
+      "을",
+      "를",
+      "에",
+      "의",
+      "과",
+      "와"
+    ];
+
+    // 키워드에서 중요하지 않은 단어들을 제거하고 중요한 단어들을 조합하여 제목을 생성합니다.
+    List<String> importantWords =
+        keyPhrases.where((word) => !stopWords.contains(word)).take(3).toList();
+
+    // 중요한 단어들을 조합하여 제목을 생성합니다.
+    String title = importantWords.join(' ');
+
+    // 제목이 15자보다 길다면 15자까지 자릅니다.
+    if (title.length > 15) {
+      title = title.substring(0, 15);
+    }
+
+    return title;
+  }
+
+  List<String> extractKeyPhrases(String text) {
+    // 예시: 간단한 키워드 추출 (실제 로직은 더욱 복잡할 수 있습니다)
+    List<String> words = text.split(RegExp(r'\s+'));
+    List<String> keyPhrases = words.where((word) => word.length > 1).toList();
+
+    return keyPhrases;
   }
 
   void _toggleMediaSelection(int index) {
