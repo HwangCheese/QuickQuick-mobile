@@ -135,12 +135,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     String text = _controller.text;
     List<String> lines = text.split('\n');
 
-    // 요약 추천 로직
-    if (lines.length > 10 && !_shouldShowSummaryRecommendation) {
+    // 요약 추천 로직 (100자 이상 입력 시)
+    if (text.length >= 100 && !_shouldShowSummaryRecommendation) {
       setState(() {
         _shouldShowSummaryRecommendation = true;
       });
-    } else if (lines.length <= 10 && _shouldShowSummaryRecommendation) {
+    } else if (text.length < 100 && _shouldShowSummaryRecommendation) {
       setState(() {
         _shouldShowSummaryRecommendation = false;
       });
@@ -1059,6 +1059,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   // 제목 생성 함수
   String generateTitle(String text) {
+    // 입력 텍스트가 너무 짧을 경우 해당 텍스트를 그대로 제목으로 사용
+    if (text.trim().length <= 15) {
+      return text.trim();
+    }
+
     List<String> keyPhrases = extractKeyPhrases(text);
 
     // 불용어 리스트를 정의합니다.
@@ -1085,9 +1090,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     // 중요한 단어들을 조합하여 제목을 생성합니다.
     String title = importantWords.join(' ');
 
-    // 제목이 15자보다 길다면 15자까지 자릅니다.
-    if (title.length > 15) {
-      title = title.substring(0, 15);
+    // 제목이 비어 있거나 15자보다 길다면 15자까지 자릅니다.
+    if (title.isEmpty || title.length > 15) {
+      title = text.trim().substring(0, 15);
     }
 
     return title;
@@ -1301,114 +1306,193 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    return PopScope(
-      onPopInvoked: (isGesture) {
-        _saveMemoToServer(); // 서버에 메모를 저장하는 동작을 수행합니다.
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
+    return Scaffold(
+      resizeToAvoidBottomInset: true, // 키보드에 의해 위젯이 가려지지 않도록 설정
+      backgroundColor: Color(0xFFFFE996),
+      appBar: AppBar(
         backgroundColor: Color(0xFFFFE996),
-        appBar: AppBar(
-          backgroundColor: Color(0xFFFFE996),
-          leading: Padding(
-            padding: const EdgeInsets.only(left: 16.0),
-            child: BackButton(
-              color: Colors.black,
-              onPressed: () async {
-                await _saveMemoToServer();
-                Navigator.pop(context, {
-                  'text': _controller.text,
-                  'color': _backgroundColor,
-                  'memo_id': widget.initialMemoId,
-                });
-              },
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: BackButton(
+            color: Colors.black,
+            onPressed: () async {
+              await _saveMemoToServer();
+              Navigator.pop(context, {
+                'text': _controller.text,
+                'color': _backgroundColor,
+                'memo_id': widget.initialMemoId,
+              });
+            },
+          ),
+        ),
+        title: Text('메모 작성', style: TextStyle(color: Colors.black)),
+        actions: <Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Wrap(
+              spacing: 16.0, // 버튼 간의 간격을 일정하게 유지
+              children: <Widget>[
+                IconButton(
+                  iconSize: 30.0,
+                  icon: const Icon(Icons.attach_file),
+                  onPressed: _pickImageOrFile,
+                ),
+                IconButton(
+                  iconSize: 30.0,
+                  icon: _isRecording
+                      ? Icon(Icons.stop, color: Colors.red)
+                      : Icon(CupertinoIcons.mic),
+                  onPressed: _isRecording ? _stopRecording : _startRecording,
+                ),
+                IconButton(
+                  iconSize: 30.0,
+                  icon: const Icon(Icons.edit_note),
+                  onPressed: _getSummary,
+                ),
+                IconButton(
+                  iconSize: 30.0,
+                  icon: const Icon(Icons.translate),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return Container(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: _languages.map((String language) {
+                              return ListTile(
+                                title: Text(_getLanguageName(language)),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedLanguage = language;
+                                  });
+                                  Navigator.pop(context); // 메뉴를 닫음
+                                  _translate(); // 번역 실행
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  tooltip: 'Translate Text',
+                ),
+                IconButton(
+                  iconSize: 30.0,
+                  icon: Icon(Icons.send_rounded, color: Colors.black),
+                  onPressed: _saveAndShareMemo,
+                ),
+              ],
             ),
           ),
-          title: Text('메모 작성', style: TextStyle(color: Colors.black)),
-          actions: <Widget>[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Wrap(
-                spacing: 16.0, // 버튼 간의 간격을 일정하게 유지
-                children: <Widget>[
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: const Icon(Icons.attach_file),
-                    onPressed: _pickImageOrFile,
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: _isRecording
-                        ? Icon(Icons.stop, color: Colors.red)
-                        : Icon(CupertinoIcons.mic),
-                    onPressed: _isRecording ? _stopRecording : _startRecording,
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: const Icon(Icons.edit_note),
-                    onPressed: _getSummary,
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: const Icon(Icons.translate),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return Container(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: _languages.map((String language) {
-                                return ListTile(
-                                  title: Text(_getLanguageName(language)),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedLanguage = language;
-                                    });
-                                    Navigator.pop(context); // 메뉴를 닫음
-                                    _translate(); // 번역 실행
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    tooltip: 'Translate Text',
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: Icon(Icons.send_rounded, color: Colors.black),
-                    onPressed: _saveAndShareMemo,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        body: _isLoading
-            ? Center(child: CircularProgressIndicator()) // 로딩 중일 때는 로딩 인디케이터 표시
-            : GestureDetector(
-                onTap: () {
-                  FocusScope.of(context).unfocus(); // 키보드 내리기
-                },
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      SizedBox(height: 10.0),
-                      Image.asset(
-                        'assets/images/img_quickduck.png',
-                        height: 80,
+        ],
+      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator()) // 로딩 중일 때는 로딩 인디케이터 표시
+          : GestureDetector(
+              onTap: () {
+                FocusScope.of(context).unfocus(); // 키보드 내리기
+              },
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    SizedBox(height: 10.0),
+                    Image.asset(
+                      'assets/images/img_quickduck.png',
+                      height: 80,
+                    ),
+                    SizedBox(height: 25.0),
+                    Container(
+                      width: screenWidth * 0.9,
+                      height: screenHeight * 0.5,
+                      decoration: BoxDecoration(
+                        color: _backgroundColor,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8.0,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 25.0),
+                      child: Column(
+                        children: [
+                          if (_mediaPaths.isNotEmpty ||
+                              _fetchedImages.isNotEmpty)
+                            Expanded(
+                              flex: 5,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount:
+                                    _mediaPaths.length, // 미디어 리스트 수 만큼 표시
+                                itemBuilder: (context, index) {
+                                  return _buildMediaTile(
+                                      _mediaPaths[index], index);
+                                },
+                              ),
+                            ),
+                          if (_filePaths.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                children:
+                                    List.generate(_filePaths.length, (index) {
+                                  return _buildFileTile(_filePaths[index],
+                                      index + _mediaPaths.length);
+                                }),
+                              ),
+                            ),
+                          Expanded(
+                            flex: 5,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: _isMediaSelected && _imageData != null
+                                  ? Container(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            screenWidth * 0.9, // 이미지의 최대 너비를 제한
+                                        maxHeight: screenHeight *
+                                            0.4, // 이미지의 최대 높이를 제한
+                                      ),
+                                      child: Image.memory(
+                                        _imageData!,
+                                        fit: BoxFit.contain, // 이미지를 원래 비율로 맞춤
+                                      ),
+                                    )
+                                  : TextField(
+                                      controller: _controller,
+                                      maxLines: null,
+                                      focusNode: _focusNode,
+                                      onChanged: (text) {
+                                        _checkAndRecommendSummary(); // 텍스트가 변경될 때마다 요약 추천 체크
+                                      },
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        hintText: '메모를 입력하세요...',
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 16.0,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
+                      SizedBox(height: 20.0),
+                    if (_summary.isNotEmpty)
                       Container(
                         width: screenWidth * 0.9,
-                        height: screenHeight * 0.5,
+                        padding: EdgeInsets.all(16.0),
                         decoration: BoxDecoration(
-                          color: _backgroundColor,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16.0),
                           boxShadow: [
                             BoxShadow(
@@ -1418,193 +1502,129 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                             ),
                           ],
                         ),
-                        child: Column(
-                          children: [
-                            if (_mediaPaths.isNotEmpty ||
-                                _fetchedImages.isNotEmpty)
-                              Expanded(
-                                flex: 5,
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount:
-                                      _mediaPaths.length, // 미디어 리스트 수 만큼 표시
-                                  itemBuilder: (context, index) {
-                                    return _buildMediaTile(
-                                        _mediaPaths[index], index);
-                                  },
-                                ),
-                              ),
-                            if (_filePaths.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  children:
-                                      List.generate(_filePaths.length, (index) {
-                                    return _buildFileTile(_filePaths[index],
-                                        index + _mediaPaths.length);
-                                  }),
-                                ),
-                              ),
-                            Expanded(
-                              flex: 5,
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                                child: _isMediaSelected && _imageData != null
-                                    ? Container(
-                                        constraints: BoxConstraints(
-                                          maxWidth: screenWidth *
-                                              0.9, // 이미지의 최대 너비를 제한
-                                          maxHeight: screenHeight *
-                                              0.4, // 이미지의 최대 높이를 제한
-                                        ),
-                                        child: Image.memory(
-                                          _imageData!,
-                                          fit: BoxFit.contain, // 이미지를 원래 비율로 맞춤
-                                        ),
-                                      )
-                                    : TextField(
-                                        controller: _controller,
-                                        maxLines: null,
-                                        focusNode: _focusNode,
-                                        onChanged: (text) {
-                                          _checkAndRecommendSummary(); // 텍스트가 변경될 때마다 요약 추천 체크
-                                        },
-                                        decoration: InputDecoration(
-                                          border: InputBorder.none,
-                                          hintText: '메모를 입력하세요...',
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: 16.0,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                              ),
+                        child: Text(
+                          _summary,
+                          style: TextStyle(fontSize: 16.0, color: Colors.black),
+                        ),
+                      ),
+                    if (_transcription.isNotEmpty) // 트랜스크립션 내용이 있을 때만 표시
+                      SizedBox(height: 20.0),
+                    if (_transcription.isNotEmpty)
+                      Container(
+                        width: screenWidth * 0.9,
+                        padding: EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8.0,
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
+                        child: Text(
+                          _transcription,
+                          style: TextStyle(fontSize: 16.0, color: Colors.black),
+                        ),
                       ),
-                      if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
-                        SizedBox(height: 20.0),
-                      if (_summary.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _summary,
-                            style:
-                                TextStyle(fontSize: 16.0, color: Colors.black),
-                          ),
-                        ),
-                      if (_transcription.isNotEmpty) // 트랜스크립션 내용이 있을 때만 표시
-                        SizedBox(height: 20.0),
-                      if (_transcription.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _transcription,
-                            style:
-                                TextStyle(fontSize: 16.0, color: Colors.black),
-                          ),
-                        ),
-                      if (_translatedText.isNotEmpty) SizedBox(height: 20.0),
-                      if (_translatedText.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _translatedText,
-                            style:
-                                TextStyle(fontSize: 16.0, color: Colors.black),
-                          ),
-                        ),
-                      SizedBox(height: 40.0),
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Container(
+                    if (_translatedText.isNotEmpty) SizedBox(height: 20.0),
+                    if (_translatedText.isNotEmpty)
+                      Container(
+                        width: screenWidth * 0.9,
+                        padding: EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
                           color: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: Container(
-                            width: MediaQuery.of(context).size.width,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: colorMap.entries.map((entry) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _backgroundColor = entry.value;
-                                      });
-                                    },
-                                    child: Container(
-                                      margin:
-                                          EdgeInsets.symmetric(horizontal: 10),
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: entry.value,
-                                        borderRadius:
-                                            BorderRadius.circular(20.0),
-                                        border: Border.all(
-                                          color: _backgroundColor == entry.value
-                                              ? Colors.black
-                                              : Colors.transparent,
-                                          width: 2.0,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: _backgroundColor == entry.value
-                                            ? Icon(Icons.check,
-                                                color: Colors.black)
-                                            : SizedBox.shrink(),
+                          borderRadius: BorderRadius.circular(16.0),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8.0,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _translatedText,
+                          style: TextStyle(fontSize: 16.0, color: Colors.black),
+                        ),
+                      ),
+                    SizedBox(height: 40.0),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        color: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Container(
+                          width: MediaQuery.of(context).size.width,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: colorMap.entries.map((entry) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _backgroundColor = entry.value;
+                                    });
+                                  },
+                                  child: Container(
+                                    margin:
+                                        EdgeInsets.symmetric(horizontal: 10),
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: entry.value,
+                                      borderRadius: BorderRadius.circular(20.0),
+                                      border: Border.all(
+                                        color: _backgroundColor == entry.value
+                                            ? Colors.black
+                                            : Colors.transparent,
+                                        width: 2.0,
                                       ),
                                     ),
-                                  );
-                                }).toList(),
-                              ),
+                                    child: Center(
+                                      child: _backgroundColor == entry.value
+                                          ? Icon(Icons.check,
+                                              color: Colors.black)
+                                          : SizedBox.shrink(),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-      ),
+            ),
+      bottomNavigationBar: isKeyboardVisible && _shouldShowSummaryRecommendation
+          ? Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context)
+                      .viewInsets
+                      .bottom), // 키보드 위에 맞게 패딩 조정
+              child: ElevatedButton(
+                onPressed: _getSummary, // 요약 기능 실행
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white, // 버튼 색상 흰색
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0), // 둥근 모서리
+                  ),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 30, vertical: 10), // 패딩 설정
+                ),
+                child: Text(
+                  '요약',
+                  style: TextStyle(color: Colors.black, fontSize: 16),
+                ),
+              ),
+            )
+          : SizedBox.shrink(), // 키보드가 없으면 버튼도 사라지도록 설정
     );
   }
 }
