@@ -491,10 +491,8 @@ class _HomeScreenState extends State<HomeScreen> {
       memos.sort((a, b) {
         if (a['isPinned'] && !b['isPinned']) {
           return -1;
-        } else if (!a['isPinned'] && b['isPinned']) {
-          return 1;
         } else {
-          return b['timestamp'].compareTo(a['timestamp']);
+          return 1;
         }
       });
 
@@ -835,8 +833,6 @@ class _HomeScreenState extends State<HomeScreen> {
               result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
               memos.add(result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
             });
-
-            memos.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
             _sortMemos();
           }
 
