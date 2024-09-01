@@ -300,6 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _deleteMemoFromServer(memoId);
                     memos.removeAt(index);
+                    _fetchMemos();
                   });
                   Navigator.pop(context);
                 },
@@ -588,6 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedMemos.forEach((index) {
         String memoId = memos[index]['memo_id'];
         _deleteMemoFromServer(memoId);
+        _fetchMemos();
       });
       selectedMemos.clear();
       isSelectionMode = false;
