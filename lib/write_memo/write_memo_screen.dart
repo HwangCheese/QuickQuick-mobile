@@ -902,15 +902,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   void _initializeVideoController(String videoPath, int index) {
     try {
+      while (_videoControllers.length <= index) {
+        _videoControllers.add(null);
+      }
+
       final controller = VideoPlayerController.file(File(videoPath));
 
       controller.initialize().then((_) {
         setState(() {
-          if (_videoControllers.length <= index) {
-            _videoControllers.add(controller);
-          } else {
-            _videoControllers[index] = controller;
-          }
+          _videoControllers[index] = controller;
           _videoControllers[index]?.play(); // Auto-play the video
         });
       }).catchError((error) {
@@ -1345,7 +1345,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
                     border: Border.all(
-                      color: isAudio ? Colors.blue : Colors.transparent,
+                      color: Colors.transparent,
                       width: 2.0,
                     ),
                   ),
@@ -1410,7 +1410,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               },
             ),
           ),
-          title: Text('메모 작성', style: TextStyle(color: Colors.black)),
           actions: <Widget>[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1428,35 +1427,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         ? Icon(Icons.stop, color: Colors.red)
                         : Icon(CupertinoIcons.mic),
                     onPressed: _isRecording ? _stopRecording : _startRecording,
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: const Icon(Icons.translate),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return Container(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: _languages.map((String language) {
-                                return ListTile(
-                                  title: Text(_getLanguageName(language)),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedLanguage = language;
-                                    });
-                                    Navigator.pop(context); // 메뉴를 닫음
-                                    _translate(); // 번역 실행
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    tooltip: 'Translate Text',
                   ),
                   IconButton(
                     iconSize: 30.0,
