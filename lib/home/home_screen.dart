@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:convert';
@@ -12,6 +14,7 @@ import '../friends_list/friends_list_screen.dart';
 import '../write_memo/write_memo_screen.dart';
 import '../login/login_screen.dart';
 import 'package:sticker_memo/globals.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -26,6 +29,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<int> selectedMemos = Set<int>();
   Uint8List? imageData;
   int count = 0;
+  IO.Socket? socket;
+  final FlutterLocalNotificationsPlugin _local =
+      FlutterLocalNotificationsPlugin();
+  NotificationDetails details = const NotificationDetails(
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    ),
+    android: AndroidNotificationDetails(
+      "1",
+      "test",
+      importance: Importance.max,
+      priority: Priority.high,
+    ),
+  );
 
   Map<String, Color> colorMap = {
     'white': Colors.white,
@@ -41,7 +60,59 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchMemos(); // user의 메모 데이터를 가져오는 함수 호출
+    _initializeNotification();
+    _initializeSocket();
+    _fetchMemos();
+  }
+
+  void _initializeNotification() async {
+    if (await Permission.notification.isDenied &&
+        !await Permission.notification.isPermanentlyDenied) {
+      await [Permission.notification].request();
+    }
+    AndroidInitializationSettings android =
+        const AndroidInitializationSettings("@mipmap/ic_launcher");
+    DarwinInitializationSettings ios = const DarwinInitializationSettings(
+      requestSoundPermission: false,
+      requestBadgePermission: false,
+      requestAlertPermission: false,
+    );
+    InitializationSettings settings =
+        InitializationSettings(android: android, iOS: ios);
+    await _local.initialize(settings);
+  }
+
+  void _sendNotification(String data) async {
+    await _local.show(1, "알림", data, details);
+  }
+
+  void _initializeSocket() {
+    socket = IO.io('$SERVER_IP', <String, dynamic>{
+      'transports': ['websocket'],
+      'autoConnect': false,
+    });
+
+    socket!.connect();
+
+    socket!.on('connect', (_) {
+      print('Connected to server');
+      String user = USER_ID + ";" + USER_NAME;
+      socket!.emit('join-room', user);
+    });
+
+    // 알림
+    socket!.on('notification', (data) {
+      print('Received notification: $data');
+      _sendNotification(data);
+    });
+
+    socket!.on('connect_error', (error) {
+      print('Connection Error: $error');
+    });
+
+    socket!.on('disconnect', (_) {
+      print('Disconnected from server');
+    });
   }
 
   Future<void> _fetchMemos() async {
@@ -72,9 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
         print(memos);
         await Future.wait(fetchDetailFutures); // 모든 비동기 작업이 완료될 때까지 기다림
-
-        // 작성 시간을 기준으로 내림차순 정렬
-        memos.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
       } else {
         print('Failed to load memos: ${response.statusCode}');
       }

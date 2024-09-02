@@ -35,7 +35,6 @@ class _LoginState extends State<Login> {
       // 사용자 ID와 토큰을 전역 변수 또는 상태로 설정
       USER_ID = userId;
       USER_NAME = userName;
-      // 추가로 필요한 초기화 작업을 수행합니다.
 
       // 바로 홈 화면으로 이동
       Navigator.pushReplacement(
@@ -113,9 +112,6 @@ class _LoginState extends State<Login> {
         final String? userId = await _fetchUserId(token);
 
         if (userId != null) {
-          print('사용자 ID: $userId');
-          USER_ID = userId;
-
           // 로그인 정보 캐시에 저장
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', token);
