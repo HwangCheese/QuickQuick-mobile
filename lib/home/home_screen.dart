@@ -466,6 +466,131 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // 메모 여러 개를 공유하기 위해 새로운 메소드 생성
+  Future<void> _showFriendSelectionDialogForSelectedMemos() async {
+    if (selectedMemos.isEmpty) {
+      _showMessage('공유할 메모를 선택해주세요.');
+      return;
+    }
+
+    final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      List<Map<String, String>> friends = data
+          .map<Map<String, String>>((friend) => {
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
+          .toList();
+
+      List<String> selectedFriendIds = [];
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('친구 선택'),
+                content: Container(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: friends.length,
+                    itemBuilder: (context, index) {
+                      return CheckboxListTile(
+                        title: Text(friends[index]['user_name']!),
+                        value: selectedFriendIds
+                            .contains(friends[index]['user_id']),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              selectedFriendIds.add(friends[index]['user_id']!);
+                            } else {
+                              selectedFriendIds
+                                  .remove(friends[index]['user_id']);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // 팝업 닫기
+                    },
+                    child: Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // 팝업 닫기
+                      _shareSelectedMemosWithFriends(
+                          selectedFriendIds); // 선택된 메모들을 공유
+                    },
+                    child: Text('전송'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } else {
+      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+    }
+  }
+
+  Future<void> _shareSelectedMemosWithFriends(
+      List<String> friendUserIds) async {
+    if (friendUserIds.isEmpty) {
+      _showMessage('친구를 선택해주세요.');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
+
+    try {
+      for (String friendUserId in friendUserIds) {
+        for (int index in selectedMemos) {
+          String memoId = memos[index]['memo_id'];
+
+          final url = Uri.parse('$SERVER_IP/send-memo');
+          final response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'sourceUserId': USER_ID,
+              'targetUserId': friendUserId,
+              'memoId': memoId,
+            }),
+          );
+
+          if (response.statusCode != 200) {
+            Navigator.of(context).pop();
+            _showMessage('메모 공유 실패: ${response.statusCode}');
+            return;
+          }
+        }
+      }
+
+      Navigator.of(context).pop();
+      _showMessage('메모가 성공적으로 공유되었습니다.');
+    } catch (e) {
+      Navigator.of(context).pop();
+      _showMessage('메모 공유 중 오류 발생: $e');
+    }
+  }
+
   Future<void> _shareMemoWithFriends(
       List<String> friendUserIds, String memoId) async {
     if (friendUserIds.isEmpty) {
@@ -684,10 +809,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.select_all),
                 onPressed: _selectAllMemos,
               ),
-              // IconButton(
-              //   icon: Icon(Icons.share),
-              //   onPressed: _showFriendSelectionDialog,
-              // ),
+              IconButton(
+                icon: Icon(Icons.share),
+                onPressed: _showFriendSelectionDialogForSelectedMemos,
+              ),
               IconButton(
                 icon: Icon(Icons.delete),
                 onPressed: _deleteSelectedMemos,
