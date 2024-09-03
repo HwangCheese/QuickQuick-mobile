@@ -19,6 +19,7 @@ import 'dart:math';
 import '../../globals.dart';
 import '../calendar/calendar_screen.dart';
 import 'media_viewer.dart';
+import 'package:intl/intl.dart';
 
 class WriteMemoScreen extends StatefulWidget {
   final Color? initialColor;
@@ -921,6 +922,55 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  void _extractAndLinkifyText(BuildContext context) {
+    final text = _controller.text;
+    final datePattern = RegExp(r'\d{4}[.-]\d{2}[.-]\d{2}');
+    final matches = datePattern.allMatches(text);
+
+    if (matches.isNotEmpty) {
+      matches.forEach((match) {
+        final dateString = match.group(0)!;
+        final date = DateFormat('yyyy-MM-dd').parse(dateString);
+        _showAddEventDialog(context, date, text);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('날짜가 포함된 텍스트가 없습니다.')),
+      );
+    }
+  }
+
+  void _showAddEventDialog(BuildContext context, DateTime date, String text) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('일정을 추가할까요?'),
+          content:
+              Text('날짜: ${DateFormat('yyyy-MM-dd').format(date)}\n내용: $text'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('아니오'),
+            ),
+            TextButton(
+              onPressed: () {
+                CalendarScreen.addEvent(context, date, text);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('일정이 추가되었습니다.')),
+                );
+              },
+              child: const Text('예'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 녹음 시작
   Future<void> _startRecording() async {
     // var status = await Permission.microphone.status;
@@ -1136,6 +1186,24 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       _filePaths.removeAt(index);
     });
   }
+
+//   void _removeAudio(int index) {
+//   setState(() {
+//     // 오디오 플레이어가 있을 경우 정리합니다.
+//     if (_audioPlayers.isNotEmpty && _audioPlayers.length > index && _audioPlayers[index] != null) {
+//       _audioPlayers[index]?.dispose();
+//       _audioPlayers.removeAt(index);
+//     }
+
+//     // 오디오 파일 경로를 리스트에서 제거합니다.
+//     if (_audioPath.length > index) {
+//       _audioPath.removeAt(index);
+//     }
+
+//     // 선택된 미디어 인덱스를 초기화합니다.
+//     _selectedMediaIndex = null;
+//   });
+// }
 
   // 제목 생성 함수
   String generateTitle(String text) {
@@ -1529,6 +1597,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                         ),
                                       ),
                               ),
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: () {
+                                _extractAndLinkifyText(context);
+                              },
+                              child: const Text('메모 저장'),
                             ),
                           ],
                         ),
