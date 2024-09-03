@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({Key? key}) : super(key: key);
@@ -30,16 +31,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _addEvent(DateTime date, String event) {
     setState(() {
-      if (_events[date] != null) {
-        _events[date]!.add(event);
+      final localDate = DateTime(date.year, date.month, date.day);
+      if (_events.containsKey(localDate)) {
+        _events[localDate]!.add(event);
       } else {
-        _events[date] = [event];
+        _events[localDate] = [event];
       }
+      // Optional: Sort events after adding
+      _events[localDate] = _sortEvents(_events[localDate]!);
     });
   }
 
   List<String> _getEventsForDay(DateTime day) {
-    return _events[day] ?? [];
+    final localDate = DateTime(day.year, day.month, day.day);
+    return _events[localDate] ?? [];
   }
 
   List<String> _sortEvents(List<String> events) {
@@ -61,13 +66,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return hour;
   }
 
+  String _formatTime(int hour) {
+    final period = hour >= 12 ? '오후' : '오전';
+    final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    return '$period $formattedHour시';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final events = _sortEvents(_getEventsForDay(_selectedDay ?? _focusedDay));
+    final events = _getEventsForDay(_selectedDay ?? _focusedDay);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('캘린더'),
+        title: const Text('캘린더'),
       ),
       body: Padding(
         padding: const EdgeInsets.only(
@@ -81,7 +92,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 titleCentered: true,
                 leftChevronVisible: true,
                 rightChevronVisible: true,
-                titleTextStyle: TextStyle(fontSize: 23.0),
+                titleTextStyle: const TextStyle(fontSize: 23.0),
                 headerMargin: const EdgeInsets.only(bottom: 30.0),
               ),
               firstDay: DateTime.utc(2010, 10, 16),
@@ -108,7 +119,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       child: Container(
                         width: 7,
                         height: 7,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.blue,
                         ),
@@ -122,9 +133,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 todayDecoration: BoxDecoration(
                   color: Colors.transparent,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Color(0xFFBBDEFB), width: 1.5),
+                  border:
+                      Border.all(color: const Color(0xFFBBDEFB), width: 1.5),
                 ),
-                todayTextStyle: TextStyle(
+                todayTextStyle: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
                 ),
@@ -145,15 +157,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   final period = parts[0];
                   final time = parts[1];
                   final description = parts.sublist(2).join(' ');
-                  final formattedTime = _convertTo24HourFormat(period, time);
+                  final hour = _convertTo24HourFormat(period, time);
+                  final formattedTime = _formatTime(hour);
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10.0),
                     child: Row(
                       children: [
                         Text(
-                          '$formattedTime시',
-                          style: TextStyle(
+                          formattedTime,
+                          style: const TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.bold,
                           ),

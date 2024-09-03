@@ -924,15 +924,38 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   void _extractAndLinkifyText(BuildContext context) {
     final text = _controller.text;
-    final datePattern = RegExp(r'\d{4}[.-]\d{2}[.-]\d{2}');
+    final datePattern = RegExp(
+        r'\b(?:(\d{1,4})[.-](\d{1,2})[.-](\d{1,2})|(\d{1,2})[월.]?\s*(\d{1,2})[일]?)\b');
     final matches = datePattern.allMatches(text);
 
     if (matches.isNotEmpty) {
-      matches.forEach((match) {
-        final dateString = match.group(0)!;
-        final date = DateFormat('yyyy-MM-dd').parse(dateString);
-        _showAddEventDialog(context, date, text);
-      });
+      for (final match in matches) {
+        DateTime? date;
+
+        if (match.group(1) != null) {
+          // yyyy-mm-dd, yy-m-d, etc. 형식
+          final year = int.parse(match.group(1)!);
+          final month = int.parse(match.group(2)!);
+          final day = int.parse(match.group(3)!);
+
+          date = DateTime(
+            year < 100 ? (year + 2000) : year, // 2자리 연도 처리
+            month,
+            day,
+          );
+        } else if (match.group(4) != null) {
+          // "7월 14일" 또는 "7.14" 형식
+          final month = int.parse(match.group(4)!);
+          final day = int.parse(match.group(5)!);
+
+          final currentYear = DateTime.now().year;
+          date = DateTime(currentYear, month, day);
+        }
+
+        if (date != null) {
+          _showAddEventDialog(context, date, text);
+        }
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('날짜가 포함된 텍스트가 없습니다.')),
@@ -1394,6 +1417,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  // 이 함수는 _buildMediaTile에서도 사용됩니다.
   Widget _buildMediaTile(String filePath, int index) {
     final isVideo = filePath.endsWith('.mp4') ||
         filePath.endsWith('.MOV') ||
