@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:sticker_memo/screens/write_memo/write_memo_screen.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:io';
@@ -28,6 +31,7 @@ class _MediaViewerState extends State<MediaViewer> {
   int _currentPage = 0;
   bool _isReady = false;
   PDFViewController? _pdfViewController;
+  String _summary = '';
 
   @override
   void initState() {
@@ -164,20 +168,33 @@ class _MediaViewerState extends State<MediaViewer> {
               bottom: 30,
               left: 0,
               right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
                 children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      widget.onDelete();
-                    },
-                    child: Text('삭제'),
-                  ),
-                  SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text('닫기'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isAudio) ...[
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context, 'transcribe');
+                          },
+                          child: Text('텍스트 변환'),
+                        ),
+                        SizedBox(width: 10),
+                      ],
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          widget.onDelete();
+                        },
+                        child: Text('삭제'),
+                      ),
+                      SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('닫기'),
+                      ),
+                    ],
                   ),
                 ],
               ),

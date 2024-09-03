@@ -1370,7 +1370,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _openMediaViewer(String filePath, int index, bool isFile) async {
-    Navigator.push(
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MediaViewer(
@@ -1387,9 +1387,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         ),
       ),
     );
+
+    // 'transcribe'가 반환된 경우 _transcribeM4aFile 함수 호출
+    if (result == 'transcribe') {
+      _transcribeM4aFile(filePath);
+    }
   }
 
-  // 이 함수는 _buildMediaTile에서도 사용됩니다.
   Widget _buildMediaTile(String filePath, int index) {
     final isVideo = filePath.endsWith('.mp4') ||
         filePath.endsWith('.MOV') ||
