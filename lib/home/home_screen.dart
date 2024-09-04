@@ -24,11 +24,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> memos = [];
   List<Map<String, dynamic>> datas = [];
+  List<String> memoTexts = [];
   List<VideoPlayerController?> _homeVideoControllers = [];
   bool isSelectionMode = false;
   Set<int> selectedMemos = Set<int>();
   Uint8List? imageData;
   int count = 0;
+  final TextEditingController _searchController = TextEditingController();
+
   IO.Socket? socket;
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
@@ -63,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeNotification();
     _initializeSocket();
     _fetchMemos();
+    //_searchController.addListener(listener);
   }
 
   void _initializeNotification() async {
@@ -100,8 +104,14 @@ class _HomeScreenState extends State<HomeScreen> {
       socket!.emit('join-room', user);
     });
 
-    // 알림
-    socket!.on('notification', (data) {
+    // 친구 추가 알림
+    socket!.on('add-friend', (data) {
+      print('Received notification: $data');
+      _sendNotification(data);
+    });
+
+    // 메모 수신 알림
+    socket!.on('new-memo', (data) {
       print('Received notification: $data');
       _sendNotification(data);
     });
@@ -185,8 +195,6 @@ class _HomeScreenState extends State<HomeScreen> {
             'originalIndex': originalIndex.toString(),
             'data': memoItems,
           });
-
-          setState(() {}); // 여기에서 상태를 업데이트
         }
       } else {
         print('Failed to load memo datas: ${response.statusCode}');
@@ -286,7 +294,9 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        return utf8.decode(response.bodyBytes);
+        String text = utf8.decode(response.bodyBytes);
+        if (!memoTexts.contains(text)) memoTexts.add(text);
+        return text;
       } else {
         print('파일 불러오기 실패: ${response.statusCode}');
         return null;
@@ -334,6 +344,10 @@ class _HomeScreenState extends State<HomeScreen> {
       print('비디오 불러오기 실패: $e');
       return null;
     }
+  }
+
+  void _filterMemos() {
+    setState(() {});
   }
 
   void _showMenu(BuildContext context, int index) {
@@ -791,250 +805,286 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight),
-        child: AppBar(
-          title: isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
-          backgroundColor: Colors.transparent,
-          leading: isSelectionMode
-              ? IconButton(
-                  icon: Icon(Icons.close),
-                  onPressed: _toggleSelectionMode,
-                )
-              : null,
-          actions: [
-            if (isSelectionMode) ...[
-              IconButton(
-                icon: Icon(Icons.select_all),
-                onPressed: _selectAllMemos,
-              ),
-              IconButton(
-                icon: Icon(Icons.share),
-                onPressed: _showFriendSelectionDialogForSelectedMemos,
-              ),
-              IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: _deleteSelectedMemos,
-              ),
-            ],
-            IconButton(
-              icon: Icon(Icons.logout),
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('token');
-                await prefs.remove('userId');
-                await prefs.remove('userName');
-
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => Login()),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _fetchMemos, // 새로고침 시 호출될 함수
-        child: Padding(
-          padding: const EdgeInsets.only(
-              top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Stack(
-                children: <Widget>[
-                  Center(
-                    child: Transform.translate(
-                      offset: Offset(10, -25), // y값을 음수로 설정하여 이미지를 위로 이동
-                      child: Image.asset(
-                        'assets/images/img_logo.png',
-                        height: 100,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: PopupMenuButton<int>(
-                      icon: Icon(Icons.more_vert, size: 35.0),
-                      onSelected: (int result) {
-                        if (result == 0) {
-                          _toggleSelectionMode();
-                        } else if (result == 1) {
-                          _navigateToCalendar(context);
-                        } else if (result == 2) {
-                          _navigateToFriendsList(context);
-                        }
-                      },
-                      itemBuilder: (BuildContext context) =>
-                          <PopupMenuEntry<int>>[
-                        const PopupMenuItem<int>(
-                          value: 0,
-                          child: Text('선택'),
-                        ),
-                        const PopupMenuItem<int>(
-                          value: 1,
-                          child: Text('캘린더'),
-                        ),
-                        const PopupMenuItem<int>(
-                          value: 2,
-                          child: Text('친구 목록'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 1,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: memos.length,
-                  itemBuilder: (context, index) {
-                    bool isSelected = selectedMemos.contains(index);
-
-                    List<Map<String, dynamic>> memoDatas = datas
-                        .where(
-                            (data) => data['originalIndex'] == index.toString())
-                        .expand((data) => data['data'])
-                        .map<Map<String, dynamic>>(
-                            (item) => item as Map<String, dynamic>)
-                        .toList();
-
-                    // 첫 번째 이미지나 비디오 또는 텍스트 찾기
-                    Map<String, dynamic>? firstMedia;
-                    if (memoDatas.isNotEmpty) {
-                      firstMedia = memoDatas.firstWhere(
-                        (data) =>
-                            data['format'] == 'jpg' ||
-                            data['format'] == 'png' ||
-                            data['format'] == 'jpeg' ||
-                            data['format'] == 'mp4' ||
-                            data['format'] == 'MOV' ||
-                            data['format'] == 'txt',
-                        orElse: () => {},
-                      );
-                    }
-
-                    return GestureDetector(
-                      onTap: isSelectionMode
-                          ? () => _toggleMemoSelection(index)
-                          : () => _editMemo(context, index),
-                      onLongPress: () => _showMenu(context, index),
-                      child: Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16.0),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8.0),
-                              border: Border.all(color: Colors.grey),
-                              color: memos[index]['color'] ?? Colors.white,
-                            ),
-                            child: Center(
-                              child: firstMedia != null && firstMedia.isNotEmpty
-                                  ? FutureBuilder<Widget>(
-                                      future: _getDataWidget(
-                                          memos[index]['title'],
-                                          firstMedia['data_id'],
-                                          firstMedia['format'],
-                                          index),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState ==
-                                            ConnectionState.done) {
-                                          if (snapshot.hasData) {
-                                            return snapshot.data!;
-                                          } else {
-                                            return Text('데이터를 불러올 수 없습니다.');
-                                          }
-                                        } else {
-                                          return CircularProgressIndicator();
-                                        }
-                                      },
-                                    )
-                                  : Text(
-                                      '내용 없음',
-                                      style: TextStyle(fontSize: 16.0),
-                                    ),
-                            ),
-                          ),
-                          if (memos[index]['isPinned'])
-                            Positioned(
-                              top: 8.0,
-                              right: 8.0,
-                              child: Icon(
-                                Icons.push_pin,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          if (isSelectionMode)
-                            Positioned(
-                              top: 8.0,
-                              left: 8.0,
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Colors.blue[400]
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? Colors.transparent
-                                        : Colors.grey,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.check,
-                                  size: 16,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.transparent,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus(); // 키보드 내리기
+      },
+      child: Scaffold(
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(kToolbarHeight),
+          child: AppBar(
+            title:
+                isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
+            backgroundColor: Colors.transparent,
+            leading: isSelectionMode
+                ? IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: _toggleSelectionMode,
+                  )
+                : null,
+            actions: [
+              if (isSelectionMode) ...[
+                IconButton(
+                  icon: Icon(Icons.select_all),
+                  onPressed: _selectAllMemos,
                 ),
+                IconButton(
+                  icon: Icon(Icons.share),
+                  onPressed: _showFriendSelectionDialogForSelectedMemos,
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete),
+                  onPressed: _deleteSelectedMemos,
+                ),
+              ],
+              IconButton(
+                icon: Icon(Icons.logout),
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('token');
+                  await prefs.remove('userId');
+                  await prefs.remove('userName');
+
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => Login()),
+                  );
+                },
               ),
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.blue[100],
-        foregroundColor: Colors.blue[900],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30.0),
-        ),
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => WriteMemoScreen()),
-          );
-          if (result != null &&
-              result['text'] != null &&
-              result['text'].isNotEmpty) {
-            setState(() {
-              result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
-              memos.add(result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
-            });
-            _sortMemos();
-          }
+        body: RefreshIndicator(
+          onRefresh: _fetchMemos, // 새로고침 시 호출될 함수
+          child: Padding(
+            padding: const EdgeInsets.only(
+                top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Stack(
+                  children: <Widget>[
+                    Center(
+                      child: Transform.translate(
+                        offset: Offset(10, -25), // y값을 음수로 설정하여 이미지를 위로 이동
+                        child: Image.asset(
+                          'assets/images/img_logo.png',
+                          height: 100,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: PopupMenuButton<int>(
+                        icon: Icon(Icons.more_vert, size: 35.0),
+                        onSelected: (int result) {
+                          if (result == 0) {
+                            _toggleSelectionMode();
+                          } else if (result == 1) {
+                            _navigateToCalendar(context);
+                          } else if (result == 2) {
+                            _navigateToFriendsList(context);
+                          }
+                        },
+                        itemBuilder: (BuildContext context) =>
+                            <PopupMenuEntry<int>>[
+                          const PopupMenuItem<int>(
+                            value: 0,
+                            child: Text('선택'),
+                          ),
+                          const PopupMenuItem<int>(
+                            value: 1,
+                            child: Text('캘린더'),
+                          ),
+                          const PopupMenuItem<int>(
+                            value: 2,
+                            child: Text('친구 목록'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '메모 검색',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide(
+                        color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
+                        width: 3.0, // 테두리 굵기
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide(
+                        color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
+                        width: 3.0, // 테두리 굵기
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide(
+                        color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
+                        width: 3.0, // 테두리 굵기
+                      ),
+                    ),
+                    suffixIcon:
+                        Icon(Icons.search, color: Colors.grey), // 검색 아이콘
+                  ),
+                ),
+                Expanded(
+                  child: GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 1,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: memos.length,
+                    itemBuilder: (context, index) {
+                      bool isSelected = selectedMemos.contains(index);
 
-          _fetchMemos(); // 서버에서 최신 데이터 불러오기
-          _sortMemos();
-        },
-        child: Icon(Icons.add),
+                      List<Map<String, dynamic>> memoDatas = datas
+                          .where((data) =>
+                              data['originalIndex'] == index.toString())
+                          .expand((data) => data['data'])
+                          .map<Map<String, dynamic>>(
+                              (item) => item as Map<String, dynamic>)
+                          .toList();
+
+                      // 첫 번째 이미지나 비디오 또는 텍스트 찾기
+                      Map<String, dynamic>? firstMedia;
+                      if (memoDatas.isNotEmpty) {
+                        firstMedia = memoDatas.firstWhere(
+                          (data) =>
+                              data['format'] == 'jpg' ||
+                              data['format'] == 'png' ||
+                              data['format'] == 'jpeg' ||
+                              data['format'] == 'mp4' ||
+                              data['format'] == 'MOV' ||
+                              data['format'] == 'txt',
+                          orElse: () => {},
+                        );
+                      }
+
+                      return GestureDetector(
+                        onTap: isSelectionMode
+                            ? () => _toggleMemoSelection(index)
+                            : () => _editMemo(context, index),
+                        onLongPress: () => _showMenu(context, index),
+                        child: Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8.0),
+                                border: Border.all(color: Colors.grey),
+                                color: memos[index]['color'] ?? Colors.white,
+                              ),
+                              child: Center(
+                                child: firstMedia != null &&
+                                        firstMedia.isNotEmpty
+                                    ? FutureBuilder<Widget>(
+                                        future: _getDataWidget(
+                                            memos[index]['title'],
+                                            firstMedia['data_id'],
+                                            firstMedia['format'],
+                                            index),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.connectionState ==
+                                              ConnectionState.done) {
+                                            if (snapshot.hasData) {
+                                              return snapshot.data!;
+                                            } else {
+                                              return Text('데이터를 불러올 수 없습니다.');
+                                            }
+                                          } else {
+                                            return CircularProgressIndicator();
+                                          }
+                                        },
+                                      )
+                                    : Text(
+                                        '내용 없음',
+                                        style: TextStyle(fontSize: 16.0),
+                                      ),
+                              ),
+                            ),
+                            if (memos[index]['isPinned'])
+                              Positioned(
+                                top: 8.0,
+                                right: 8.0,
+                                child: Icon(
+                                  Icons.push_pin,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            if (isSelectionMode)
+                              Positioned(
+                                top: 8.0,
+                                left: 8.0,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? Colors.blue[400]
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? Colors.transparent
+                                          : Colors.grey,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.check,
+                                    size: 16,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: Colors.blue[100],
+          foregroundColor: Colors.blue[900],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30.0),
+          ),
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => WriteMemoScreen()),
+            );
+            if (result != null &&
+                result['text'] != null &&
+                result['text'].isNotEmpty) {
+              setState(() {
+                result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
+                memos.add(result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
+              });
+              _sortMemos();
+            }
+
+            _fetchMemos(); // 서버에서 최신 데이터 불러오기
+            _sortMemos();
+          },
+          child: Icon(Icons.add),
+        ),
       ),
     );
   }
