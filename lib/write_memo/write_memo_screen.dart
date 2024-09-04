@@ -177,8 +177,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             _shouldShowTranslationRecommendation = false;
           });
         }
+      } else {
+        // 입력이 비어있는 경우, 번역 추천 버튼 숨기기
+        setState(() {
+          _shouldShowTranslationRecommendation = false;
+        });
       }
 
+      // 이벤트 라인 확인 및 다이얼로그 표시
       for (String line in lines) {
         if (_isEventLine(line)) {
           _showEventConfirmationDialog(line);
@@ -189,6 +195,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<Set<String>> _detectLanguages(String text) async {
+    // 필터링: 문자열이 숫자만 포함되어 있는지 또는 비문자 문자만 포함되어 있는지 확인
+    if (RegExp(r'^\d+$').hasMatch(text) ||
+        RegExp(r'^[^\p{L}]+$').hasMatch(text)) {
+      return {'ko'}; // 감지되지 않음
+    }
+
     final url =
         'https://translation.googleapis.com/language/translate/v2/detect?key=$apiKey';
 
@@ -196,10 +208,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'q': text,
-        }),
+        body: jsonEncode({'q': text}),
       );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -213,6 +226,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             }
           }
         }
+        print('Detected languages: $detectedLanguages');
         return detectedLanguages;
       } else {
         throw Exception('Failed to detect languages');
