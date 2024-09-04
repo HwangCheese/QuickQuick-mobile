@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> memos = [];
   List<Map<String, dynamic>> datas = [];
+  List<Map<String, dynamic>> filteredMemos = [];
   List<String> memoTexts = [];
   List<VideoPlayerController?> _homeVideoControllers = [];
   bool isSelectionMode = false;
@@ -66,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeNotification();
     _initializeSocket();
     _fetchMemos();
-    //_searchController.addListener(listener);
+    _searchController.addListener(_filterMemos);
   }
 
   void _initializeNotification() async {
@@ -347,7 +348,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _filterMemos() {
-    setState(() {});
+    String query = _searchController.text.toLowerCase();
+
+    setState(() {
+      // 메모 리스트에서 제목이나 텍스트에 검색어가 포함된 항목만 필터링
+      filteredMemos = memos.where((memo) {
+        String memoTitle = memo['title'].toLowerCase();
+        int originalIndex = memos.indexOf(memo);
+
+        // 해당 메모의 텍스트를 가져옴
+        String? memoText =
+            memoTexts.isNotEmpty && memoTexts.length > originalIndex
+                ? memoTexts[originalIndex].toLowerCase()
+                : "";
+
+        return memoTitle.contains(query) || memoText.contains(query);
+      }).toList();
+    });
   }
 
   void _showMenu(BuildContext context, int index) {
@@ -908,6 +925,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 TextField(
                   controller: _searchController,
+                  onChanged: (value) {
+                    _filterMemos(); // 검색어 변경 시 필터링 함수 호출
+                  },
                   decoration: InputDecoration(
                     hintText: '메모 검색',
                     border: OutlineInputBorder(
@@ -943,8 +963,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
                     ),
-                    itemCount: memos.length,
+                    itemCount:
+                        filteredMemos.isEmpty && _searchController.text.isEmpty
+                            ? memos.length
+                            : filteredMemos.length,
                     itemBuilder: (context, index) {
+                      var currentMemos = filteredMemos.isEmpty &&
+                              _searchController.text.isEmpty
+                          ? memos
+                          : filteredMemos;
                       bool isSelected = selectedMemos.contains(index);
 
                       List<Map<String, dynamic>> memoDatas = datas
@@ -982,14 +1009,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8.0),
                                 border: Border.all(color: Colors.grey),
-                                color: memos[index]['color'] ?? Colors.white,
+                                color: currentMemos[index]['color'] ??
+                                    Colors.white,
                               ),
                               child: Center(
                                 child: firstMedia != null &&
                                         firstMedia.isNotEmpty
                                     ? FutureBuilder<Widget>(
                                         future: _getDataWidget(
-                                            memos[index]['title'],
+                                            currentMemos[index]['title'],
                                             firstMedia['data_id'],
                                             firstMedia['format'],
                                             index),
@@ -1012,7 +1040,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                               ),
                             ),
-                            if (memos[index]['isPinned'])
+                            if (currentMemos[index]['isPinned'])
                               Positioned(
                                 top: 8.0,
                                 right: 8.0,
