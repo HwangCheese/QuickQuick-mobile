@@ -160,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Failed to load memos: $e');
     }
+    print(memoTexts);
     _filterMemos();
   }
 
@@ -405,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _deleteMemoFromServer(memoId);
                     memos.removeAt(index);
+                    memoTexts.removeAt(index);
                     _fetchMemos();
                   });
                   Navigator.pop(context);
