@@ -9,8 +9,10 @@ import 'package:video_player/video_player.dart';
 import 'dart:convert';
 import 'dart:typed_data'; // Uint8List를 사용하기 위해 추가
 import 'dart:io'; // File 클래스를 사용하기 위해 추가
+import '../../socket_service.dart';
 import '../calendar/calendar_screen.dart';
 import '../friends_list/friends_list_screen.dart';
+import '../video_call/video_call_screen.dart';
 import '../write_memo/write_memo_screen.dart';
 import '../login/login_screen.dart';
 import 'package:sticker_memo/globals.dart';
@@ -32,23 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Uint8List? imageData;
   int count = 0;
   final TextEditingController _searchController = TextEditingController();
-
-  IO.Socket? socket;
-  final FlutterLocalNotificationsPlugin _local =
-      FlutterLocalNotificationsPlugin();
-  NotificationDetails details = const NotificationDetails(
-    iOS: DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    ),
-    android: AndroidNotificationDetails(
-      "1",
-      "test",
-      importance: Importance.max,
-      priority: Priority.high,
-    ),
-  );
+  final SocketService _socketService = SocketService();
 
   Map<String, Color> colorMap = {
     'white': Colors.white,
@@ -64,66 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeNotification();
-    _initializeSocket();
     _fetchMemos();
     _searchController.addListener(_filterMemos);
-  }
-
-  void _initializeNotification() async {
-    if (await Permission.notification.isDenied &&
-        !await Permission.notification.isPermanentlyDenied) {
-      await [Permission.notification].request();
-    }
-    AndroidInitializationSettings android =
-        const AndroidInitializationSettings("@mipmap/ic_launcher");
-    DarwinInitializationSettings ios = const DarwinInitializationSettings(
-      requestSoundPermission: false,
-      requestBadgePermission: false,
-      requestAlertPermission: false,
-    );
-    InitializationSettings settings =
-        InitializationSettings(android: android, iOS: ios);
-    await _local.initialize(settings);
-  }
-
-  void _sendNotification(String data) async {
-    await _local.show(1, "알림", data, details);
-  }
-
-  void _initializeSocket() {
-    socket = IO.io('$SERVER_IP', <String, dynamic>{
-      'transports': ['websocket'],
-      'autoConnect': false,
-    });
-
-    socket!.connect();
-
-    socket!.on('connect', (_) {
-      print('Connected to server');
-      String user = USER_ID + ";" + USER_NAME;
-      socket!.emit('join-room', user);
-    });
-
-    // 친구 추가 알림
-    socket!.on('add-friend', (data) {
-      print('Received notification: $data');
-      _sendNotification(data);
-    });
-
-    // 메모 수신 알림
-    socket!.on('new-memo', (data) {
-      print('Received notification: $data');
-      _sendNotification(data);
-    });
-
-    socket!.on('connect_error', (error) {
-      print('Connection Error: $error');
-    });
-
-    socket!.on('disconnect', (_) {
-      print('Disconnected from server');
-    });
   }
 
   Future<void> _fetchMemos() async {
@@ -828,6 +756,82 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _showFriendSelectionDialogForVideoCall() async {
+    final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      List<Map<String, String>> friends = data
+          .map<Map<String, String>>((friend) => {
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
+          .toList();
+
+      List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('친구 선택'),
+                content: Container(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: friends.length,
+                    itemBuilder: (context, index) {
+                      return CheckboxListTile(
+                        title: Text(friends[index]['user_name']!),
+                        value: selectedFriendIds
+                            .contains(friends[index]['user_id']),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              selectedFriendIds.add(friends[index]['user_id']!);
+                            } else {
+                              selectedFriendIds
+                                  .remove(friends[index]['user_id']);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // 팝업 닫기
+                    },
+                    child: Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // 팝업 닫기
+                      // VideoCallScreen으로 선택된 친구들과 함께 이동
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => VideoCallScreen(
+                              selectedFriendIds: selectedFriendIds),
+                        ),
+                      );
+                    },
+                    child: Text('초대'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } else {
+      _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -862,6 +866,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _deleteSelectedMemos,
                 ),
               ],
+              IconButton(
+                icon: Icon(Icons.video_call_outlined),
+                onPressed: _showFriendSelectionDialogForVideoCall,
+              ),
               IconButton(
                 icon: Icon(Icons.logout),
                 onPressed: () async {
