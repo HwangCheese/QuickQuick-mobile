@@ -90,25 +90,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     'ko', // 한국어
   ];
 
-  String _getLanguageName(String code) {
-    switch (code) {
-      case 'en':
-        return 'English';
-      case 'es':
-        return 'Spanish';
-      case 'fr':
-        return 'French';
-      case 'de':
-        return 'German';
-      case 'ja':
-        return 'Japanese';
-      case 'ko':
-        return 'Korean';
-      default:
-        return 'Unknown';
-    }
-  }
-
   String getColorName(Color color) {
     // colorMap의 value 중 일치하는 Color가 있는지 확인
     String colorKey = colorMap.entries
@@ -248,55 +229,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       setState(() {
         _shouldShowSummaryRecommendation = false;
       });
-    }
-  }
-
-  bool _isEventLine(String line) {
-    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
-    return pattern.hasMatch(line);
-  }
-
-  void _showEventConfirmationDialog(String line) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('일정 추가 확인'),
-          content: Text('이 내용을 캘린더에 추가하시겠습니까?\n$line'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('취소'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('추가'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _processEventLine(line);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _processEventLine(String line) {
-    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
-    Match? match = pattern.firstMatch(line);
-
-    if (match != null) {
-      int month = int.parse(match.group(1)!);
-      int day = int.parse(match.group(2)!);
-      String eventDescription = match.group(3)!;
-
-      // 연도를 2024로 고정
-      DateTime eventDate = DateTime(2024, month, day);
-
-      // 캘린더에 이벤트 추가
-      CalendarScreen.addEvent(context, eventDate, eventDescription);
     }
   }
 
@@ -773,6 +705,88 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
+  bool _isEventLine(String line) {
+    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
+    return pattern.hasMatch(line);
+  }
+
+  void _showEventConfirmationDialog(String line) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('일정 추가 확인'),
+          content: Text('이 내용을 캘린더에 추가하시겠습니까?\n$line'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('추가'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processEventLine(line);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _processEventLine(String line) async {
+    // 시간 정보를 포함할 수 있는 정규식 (ex. 9월 4일 15:30 아륀이랑 놀기)
+    RegExp pattern =
+        RegExp(r'(\d{1,2})월 (\d{1,2})일(?:\s+(\d{1,2}):(\d{1,2}))?\s+(.+)');
+    Match? match = pattern.firstMatch(line);
+
+    if (match != null) {
+      int month = int.parse(match.group(1)!);
+      int day = int.parse(match.group(2)!);
+      int hour = match.group(3) != null ? int.parse(match.group(3)!) : 0;
+      int minute = match.group(4) != null ? int.parse(match.group(4)!) : 0;
+      String eventDescription = match.group(5)!;
+
+      // 연도를 2024로 고정
+      DateTime eventDate = DateTime(2024, month, day, hour, minute);
+
+      // 이벤트 날짜와 시간을 적절한 형식으로 변환 (입력된 시간이 없는 경우 00:00:00)
+      String eventDateTimeString =
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate);
+
+      // 서버로 보낼 데이터를 JSON으로 변환
+      Map<String, String> eventData = {
+        'user_id': USER_ID,
+        'event_datetime': eventDateTimeString,
+        'description': eventDescription,
+      };
+
+      // HTTP POST 요청
+      try {
+        var response = await http.post(
+          Uri.parse('$SERVER_IP/events'),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode(eventData),
+        );
+
+        if (response.statusCode == 200) {
+          print('Event added successfully: ${response.body}');
+        } else {
+          print('Failed to add event: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Error occurred: $e');
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('일정 형식이 올바르지 않습니다.')),
+      );
+    }
+  }
+
   void _pickImageOrFile() async {
     showModalBottomSheet(
       context: context,
@@ -994,7 +1008,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             ),
             TextButton(
               onPressed: () {
-                CalendarScreen.addEvent(context, date, text);
+                //CalendarScreen.addEvent(context, date, text);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('일정이 추가되었습니다.')),
@@ -1499,11 +1513,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final screenHeight = MediaQuery.of(context).size.height;
     final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      onPopInvoked: (bool value) async {
         await _saveMemoToServer();
         Navigator.of(context).popUntil((route) => route.isFirst);
-        return false; // 이 값을 false로 설정하여 기본 뒤로 가기 동작을 막음
       },
       child: Scaffold(
         resizeToAvoidBottomInset: true, // 키보드에 의해 위젯이 가려지지 않도록 설정
