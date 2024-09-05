@@ -160,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       print('Failed to load memos: $e');
     }
+    _filterMemos();
   }
 
   Future<void> _fetchMemoDetails(String memoId) async {
@@ -351,19 +352,24 @@ class _HomeScreenState extends State<HomeScreen> {
     String query = _searchController.text.toLowerCase();
 
     setState(() {
-      // 메모 리스트에서 제목이나 텍스트에 검색어가 포함된 항목만 필터링
-      filteredMemos = memos.where((memo) {
-        String memoTitle = memo['title'].toLowerCase();
-        int originalIndex = memos.indexOf(memo);
+      if (query.isEmpty) {
+        // 검색어가 없을 경우 필터링하지 않고 원래 메모 리스트 반환
+        filteredMemos = memos;
+      } else {
+        // 메모 리스트에서 제목이나 텍스트에 검색어가 포함된 항목만 필터링
+        filteredMemos = memos.where((memo) {
+          String memoTitle = memo['title'].toLowerCase();
+          int originalIndex = memos.indexOf(memo);
 
-        // 해당 메모의 텍스트를 가져옴
-        String? memoText =
-            memoTexts.isNotEmpty && memoTexts.length > originalIndex
-                ? memoTexts[originalIndex].toLowerCase()
-                : "";
+          // 해당 메모의 텍스트를 가져옴
+          String? memoText =
+              memoTexts.isNotEmpty && memoTexts.length > originalIndex
+                  ? memoTexts[originalIndex].toLowerCase()
+                  : "";
 
-        return memoTitle.contains(query) || memoText.contains(query);
-      }).toList();
+          return memoTitle.contains(query) || memoText.contains(query);
+        }).toList();
+      }
     });
   }
 
@@ -955,6 +961,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                   ),
                 ),
+                SizedBox(height: 16.0),
                 Expanded(
                   child: GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
