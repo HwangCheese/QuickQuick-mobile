@@ -1653,13 +1653,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                       ),
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            ElevatedButton(
-                              onPressed: () {
-                                _extractAndLinkifyText(context);
-                              },
-                              child: const Text('메모 저장'),
-                            ),
                           ],
                         ),
                       ),
