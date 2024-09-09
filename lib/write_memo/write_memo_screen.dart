@@ -1665,12 +1665,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           children: [
                             if (_mediaPaths.isNotEmpty ||
                                 _fetchedImages.isNotEmpty)
-                              Expanded(
-                                flex: 5,
+                              SizedBox(
+                                height: screenHeight * 0.25, // 미디어 영역의 높이 고정
                                 child: ListView.builder(
                                   scrollDirection: Axis.horizontal,
-                                  itemCount:
-                                      _mediaPaths.length, // 미디어 리스트 수 만큼 표시
+                                  itemCount: _mediaPaths.length,
                                   itemBuilder: (context, index) {
                                     return _buildMediaTile(
                                         _mediaPaths[index], index);
@@ -1678,51 +1677,49 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 ),
                               ),
                             if (_filePaths.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  children:
-                                      List.generate(_filePaths.length, (index) {
+                              Expanded(
+                                child: ListView.builder(
+                                  padding: EdgeInsets.all(8.0),
+                                  itemCount: _filePaths.length,
+                                  itemBuilder: (context, index) {
                                     return _buildFileTile(_filePaths[index],
                                         index + _mediaPaths.length, index);
-                                  }),
+                                  },
                                 ),
                               ),
-                            Expanded(
-                              flex: 5,
-                              child: Container(
+                            if (_isMediaSelected && _imageData != null)
+                              Container(
                                 padding: EdgeInsets.symmetric(horizontal: 16.0),
-                                child: _isMediaSelected && _imageData != null
-                                    ? Container(
-                                        constraints: BoxConstraints(
-                                          maxWidth: screenWidth *
-                                              0.9, // 이미지의 최대 너비를 제한
-                                          maxHeight: screenHeight *
-                                              0.4, // 이미지의 최대 높이를 제한
-                                        ),
-                                        child: Image.memory(
-                                          _imageData!,
-                                          fit: BoxFit.contain, // 이미지를 원래 비율로 맞춤
-                                        ),
-                                      )
-                                    : TextField(
-                                        controller: _controller,
-                                        maxLines: null,
-                                        focusNode: _focusNode,
-                                        onChanged: (text) {
-                                          _checkAndRecommendSummary(); // 텍스트가 변경될 때마다 요약 추천 체크
-                                        },
-                                        decoration: InputDecoration(
-                                          border: InputBorder.none,
-                                          hintText: '메모를 입력하세요...',
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: 16.0,
-                                          color: Colors.black,
-                                        ),
-                                      ),
+                                constraints: BoxConstraints(
+                                  maxWidth: screenWidth * 0.9,
+                                  maxHeight: screenHeight * 0.4,
+                                ),
+                                child: Image.memory(
+                                  _imageData!,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
-                            ),
+                            if (!_isMediaSelected || _imageData == null)
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: TextField(
+                                    controller: _controller,
+                                    maxLines: null,
+                                    focusNode: _focusNode,
+                                    onChanged: (text) {
+                                      _checkAndRecommendSummary(); // 텍스트가 변경될 때마다 요약 추천 체크
+                                    },
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
+                                      hintText: '메모를 입력하세요...',
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 16.0,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
