@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:convert';
@@ -16,7 +14,6 @@ import '../video_call/video_call_screen.dart';
 import '../write_memo/write_memo_screen.dart';
 import '../login/login_screen.dart';
 import 'package:sticker_memo/globals.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -282,15 +279,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       if (query.isEmpty) {
-        // 검색어가 없을 경우 필터링하지 않고 원래 메모 리스트 반환
         filteredMemos = memos;
       } else {
-        // 메모 리스트에서 제목이나 텍스트에 검색어가 포함된 항목만 필터링
         filteredMemos = memos.where((memo) {
+          // 미디어가 포함된 메모는 검색 결과에서 제외
+          bool hasMedia = memo['hasMedia'] ?? false;
+          if (hasMedia) {
+            return false; // 미디어가 포함된 메모는 결과에서 제외
+          }
+
           String memoTitle = memo['title'].toLowerCase();
           int originalIndex = memos.indexOf(memo);
 
-          // 해당 메모의 텍스트를 가져옴
           String? memoText =
               memoTexts.isNotEmpty && memoTexts.length > originalIndex
                   ? memoTexts[originalIndex].toLowerCase()
@@ -375,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .toList();
 
       List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
+      bool allSelected = false; // 전체 선택 상태를 나타내는 변수
 
       showDialog(
         context: context,
@@ -382,7 +383,27 @@ class _HomeScreenState extends State<HomeScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
-                title: Text('친구 선택'),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('친구 선택'),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          if (allSelected) {
+                            selectedFriendIds.clear();
+                          } else {
+                            selectedFriendIds = friends
+                                .map((friend) => friend['user_id']!)
+                                .toList();
+                          }
+                          allSelected = !allSelected;
+                        });
+                      },
+                      child: Text(allSelected ? '선택 해제' : '전체 선택'),
+                    ),
+                  ],
+                ),
                 content: Container(
                   width: double.maxFinite,
                   child: ListView.builder(
@@ -451,6 +472,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .toList();
 
       List<String> selectedFriendIds = [];
+      bool allSelected = false;
 
       showDialog(
         context: context,
@@ -458,7 +480,27 @@ class _HomeScreenState extends State<HomeScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
-                title: Text('친구 선택'),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('친구 선택'),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          if (allSelected) {
+                            selectedFriendIds.clear();
+                          } else {
+                            selectedFriendIds = friends
+                                .map((friend) => friend['user_id']!)
+                                .toList();
+                          }
+                          allSelected = !allSelected;
+                        });
+                      },
+                      child: Text(allSelected ? '선택 해제' : '전체 선택'),
+                    ),
+                  ],
+                ),
                 content: Container(
                   width: double.maxFinite,
                   child: ListView.builder(
@@ -767,7 +809,8 @@ class _HomeScreenState extends State<HomeScreen> {
               })
           .toList();
 
-      List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
+      List<String> selectedFriendNames = []; // 선택된 친구 이름을 저장하는 리스트
+      bool allSelected = false; // 전체 선택 상태를 나타내는 변수
 
       showDialog(
         context: context,
@@ -775,7 +818,27 @@ class _HomeScreenState extends State<HomeScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
-                title: Text('친구 선택'),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('친구 선택'),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          if (allSelected) {
+                            selectedFriendNames.clear();
+                          } else {
+                            selectedFriendNames = friends
+                                .map((friend) => friend['user_name']!)
+                                .toList();
+                          }
+                          allSelected = !allSelected;
+                        });
+                      },
+                      child: Text(allSelected ? '선택 해제' : '전체 선택'),
+                    ),
+                  ],
+                ),
                 content: Container(
                   width: double.maxFinite,
                   child: ListView.builder(
@@ -784,15 +847,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       return CheckboxListTile(
                         title: Text(friends[index]['user_name']!),
-                        value: selectedFriendIds
-                            .contains(friends[index]['user_id']),
+                        value: selectedFriendNames
+                            .contains(friends[index]['user_name']),
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
-                              selectedFriendIds.add(friends[index]['user_id']!);
+                              selectedFriendNames
+                                  .add(friends[index]['user_name']!);
                             } else {
-                              selectedFriendIds
-                                  .remove(friends[index]['user_id']);
+                              selectedFriendNames
+                                  .remove(friends[index]['user_name']);
                             }
                           });
                         },
@@ -815,7 +879,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => VideoCallScreen(
-                              selectedFriendIds: selectedFriendIds),
+                              selectedFriendNames: selectedFriendNames),
                         ),
                       );
                     },
