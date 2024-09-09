@@ -117,7 +117,10 @@ class SocketService {
     });
 
     socket!.on('kock', (message) {
-      print(message);
+      _sendNotification(message);
+    });
+
+    socket!.on('invite', (message) {
       _sendNotification(message);
     });
 
