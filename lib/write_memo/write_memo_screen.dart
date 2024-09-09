@@ -120,7 +120,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   void _handleTextChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       // 0.5초 동안 입력이 없으면 실행
       String text = _controller.text;
       List<String> lines = text.split('\n');
@@ -176,11 +176,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<Set<String>> _detectLanguages(String text) async {
-    // 필터링: 문자열이 숫자만 포함되어 있는지 또는 비문자 문자만 포함되어 있는지 확인
-    if (RegExp(r'^\d+$').hasMatch(text) ||
-        RegExp(r'^[^\p{L}]+$').hasMatch(text)) {
-      return {'ko'}; // 감지되지 않음
-    }
+    // 숫자만 있거나 특수문자만 있으면 감지하지 않도록 처리
+    // if (RegExp(r'^\d+$').hasMatch(text) || RegExp(r'^[^\p{L}\d]+$').hasMatch(text)) {
+    //   return {'ko'}; // 감지되지 않음으로 처리
+    // }
 
     final url =
         'https://translation.googleapis.com/language/translate/v2/detect?key=$apiKey';
@@ -1659,69 +1658,97 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
                         SizedBox(height: 20.0),
                       if (_summary.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _summary,
-                            style:
-                                TextStyle(fontSize: 16.0, color: Colors.black),
+                        GestureDetector(
+                          onDoubleTap: () {
+                            Clipboard.setData(ClipboardData(text: _summary));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Summary 텍스트가 복사되었습니다!')),
+                            );
+                          },
+                          child: Container(
+                            width: screenWidth * 0.9,
+                            padding: EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8.0,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              _summary,
+                              style: TextStyle(
+                                  fontSize: 16.0, color: Colors.black),
+                            ),
                           ),
                         ),
                       if (_transcription.isNotEmpty) // 트랜스크립션 내용이 있을 때만 표시
                         SizedBox(height: 20.0),
                       if (_transcription.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _transcription,
-                            style:
-                                TextStyle(fontSize: 16.0, color: Colors.black),
+                        GestureDetector(
+                          onDoubleTap: () {
+                            Clipboard.setData(
+                                ClipboardData(text: _transcription));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Transcription 텍스트가 복사되었습니다!')),
+                            );
+                          },
+                          child: Container(
+                            width: screenWidth * 0.9,
+                            padding: EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8.0,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              _transcription,
+                              style: TextStyle(
+                                  fontSize: 16.0, color: Colors.black),
+                            ),
                           ),
                         ),
                       if (_translatedText.isNotEmpty) SizedBox(height: 20.0),
                       if (_translatedText.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.all(16.0),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _translatedText,
-                            style:
-                                TextStyle(fontSize: 16.0, color: Colors.black),
+                        GestureDetector(
+                          onDoubleTap: () {
+                            Clipboard.setData(
+                                ClipboardData(text: _translatedText));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Translated 텍스트가 복사되었습니다!')),
+                            );
+                          },
+                          child: Container(
+                            width: screenWidth * 0.9,
+                            padding: EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 8.0,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              _translatedText,
+                              style: TextStyle(
+                                  fontSize: 16.0, color: Colors.black),
+                            ),
                           ),
                         ),
                       SizedBox(height: 40.0),
