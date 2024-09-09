@@ -115,6 +115,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  Future<void> _updateEvent(
+      DateTime date, String oldDescription, String newDescription) async {
+    // 일정 업데이트를 위한 API 요청 로직을 작성할 수 있습니다.
+    // ...
+  }
+
+  Future<void> _deleteEvent(DateTime date, String description) async {
+    // 일정 삭제를 위한 API 요청 로직을 작성할 수 있습니다.
+    // ...
+  }
+
   bool _isEventLine(String line) {
     RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
     return pattern.hasMatch(line);
@@ -192,6 +203,67 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (memo != null && _isEventLine(memo)) {
       _showEventConfirmationDialog(memo);
     }
+  }
+
+  void _showEventOptionsDialog(DateTime date, String eventDescription) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('일정 옵션'),
+          content: Text('일정을 수정하거나 삭제하시겠습니까?\n$eventDescription'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showEditEventDialog(date, eventDescription);
+              },
+              child: Text('수정'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteEvent(date, eventDescription);
+              },
+              child: Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditEventDialog(DateTime date, String oldDescription) {
+    TextEditingController _controller =
+        TextEditingController(text: oldDescription);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('일정 수정'),
+          content: TextField(
+            controller: _controller,
+            decoration: InputDecoration(labelText: '일정 내용'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _updateEvent(date, oldDescription, _controller.text);
+              },
+              child: Text('저장'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -279,22 +351,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   final time = parts[0];
                   final description = parts[1];
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10.0),
-                    child: Row(
-                      children: [
-                        Text(
-                          time,
-                          style: const TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
+                  return GestureDetector(
+                    onLongPress: () {
+                      _showEventOptionsDialog(
+                          _selectedDay ?? _focusedDay, description);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10.0),
+                      child: Row(
+                        children: [
+                          Text(
+                            time,
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(description),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(description),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
