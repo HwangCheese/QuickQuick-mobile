@@ -1519,9 +1519,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       },
       child: Scaffold(
         resizeToAvoidBottomInset: true, // 키보드에 의해 위젯이 가려지지 않도록 설정
-        backgroundColor: Color(0xFFFFE996),
+        backgroundColor: Color(0xFFADDCFF), // #ADDCFF
         appBar: AppBar(
-          backgroundColor: Color(0xFFFFE996),
+          backgroundColor: Color(0xFFADDCFF),
           leading: Padding(
             padding: const EdgeInsets.only(left: 16.0),
             child: BackButton(
@@ -1538,23 +1538,37 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               child: Wrap(
                 spacing: 16.0, // 버튼 간의 간격을 일정하게 유지
                 children: <Widget>[
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: const Icon(Icons.attach_file),
-                    onPressed: _pickImageOrFile,
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: _isRecording
-                        ? Icon(Icons.stop, color: Colors.red)
-                        : Icon(CupertinoIcons.mic),
-                    onPressed: _isRecording ? _stopRecording : _startRecording,
-                  ),
-                  IconButton(
-                    iconSize: 30.0,
-                    icon: Icon(Icons.send_rounded, color: Colors.black),
-                    onPressed: _saveAndShareMemo,
-                  ),
+                  if (_shouldShowSummaryRecommendation)
+                    IconButton(
+                        onPressed: _getSummary,
+                        icon: Image.asset(
+                          'assets/images/summary.png',
+                          height: 40,
+                        )),
+                  if (_shouldShowTranslationRecommendation)
+                    IconButton(
+                        onPressed: _translate,
+                        icon: Image.asset(
+                          'assets/images/translate.png',
+                          height: 40,
+                        )),
+                  // IconButton(
+                  //   iconSize: 30.0,
+                  //   icon: const Icon(Icons.attach_file),
+                  //   onPressed: _pickImageOrFile,
+                  // ),
+                  // IconButton(
+                  //   iconSize: 30.0,
+                  //   icon: _isRecording
+                  //       ? Icon(Icons.stop, color: Colors.red)
+                  //       : Icon(CupertinoIcons.mic),
+                  //   onPressed: _isRecording ? _stopRecording : _startRecording,
+                  // ),
+                  // IconButton(
+                  //   iconSize: 30.0,
+                  //   icon: Icon(Icons.send_rounded, color: Colors.black),
+                  //   onPressed: _saveAndShareMemo,
+                  // ),
                 ],
               ),
             ),
@@ -1570,12 +1584,41 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      SizedBox(height: 10.0),
-                      Image.asset(
-                        'assets/images/img_quickduck.png',
-                        height: 80,
+                      SizedBox(
+                        height: 30.0,
                       ),
-                      SizedBox(height: 25.0),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Image.asset(
+                              'assets/images/insert_file.png',
+                              height: 90,
+                            ),
+                            onPressed: _pickImageOrFile,
+                          ),
+                          IconButton(
+                            iconSize: 30.0,
+                            icon: _isRecording
+                                ? Icon(Icons.stop, color: Colors.red)
+                                : Image.asset(
+                                    'assets/images/record_duck.png',
+                                    height: 90,
+                                  ),
+                            onPressed:
+                                _isRecording ? _stopRecording : _startRecording,
+                          ),
+                          IconButton(
+                            iconSize: 30.0,
+                            icon: Image.asset(
+                              'assets/images/send_duck.png',
+                              height: 90,
+                            ),
+                            onPressed: _saveAndShareMemo,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 30.0),
                       Container(
                         width: screenWidth * 0.9,
                         height: screenHeight * 0.5,
@@ -1751,7 +1794,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                             ),
                           ),
                         ),
-                      SizedBox(height: 40.0),
+                      SizedBox(height: 10.0),
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: Container(
@@ -1804,51 +1847,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   ),
                 ),
               ),
-        bottomNavigationBar: isKeyboardVisible
-            ? Padding(
-                padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_shouldShowSummaryRecommendation)
-                      ElevatedButton(
-                        onPressed: _getSummary,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30.0),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 30, vertical: 10),
-                        ),
-                        child: Text(
-                          '요약',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    if (_shouldShowTranslationRecommendation)
-                      ElevatedButton(
-                        onPressed: () {
-                          _translate(); // 번역 기능 실행
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30.0),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 30, vertical: 10),
-                        ),
-                        child: Text(
-                          '번역',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                  ],
-                ),
-              )
-            : SizedBox.shrink(), // 키보드가 없으면 버튼도 사라지도록 설정
       ),
     );
   }
