@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_player/video_player.dart';
@@ -1023,15 +1024,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   // 녹음 시작
   Future<void> _startRecording() async {
-    // var status = await Permission.microphone.status;
-    // if (!status.isGranted) {
-    //   status = await Permission.microphone.request();
-    //   if (!status.isGranted) {
-    //     // 권한이 부여되지 않았으므로, 녹음을 시작하지 않음.
-    //     print("Microphone permission not granted");
-    //     return;
-    //   }
-    // }
     Directory appDocDir = await getApplicationDocumentsDirectory();
     String filePath =
         '${appDocDir.path}/memo_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
@@ -1342,29 +1334,54 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   // 파일 아이템 UI
-  Widget _buildFileTile(String filePath, int index) {
+  Widget _buildFileTile(String filePath, int index, int realIndex) {
     final fileName = filePath.split('/').last;
     final isPdf = filePath.endsWith('.pdf');
+    final isExcel = filePath.endsWith('.xls') || filePath.endsWith('.xlsx');
+    final isPpt = filePath.endsWith('.ppt') || filePath.endsWith('.pptx');
+    final isDocx = filePath.endsWith('.docx');
+    final isHwp = filePath.endsWith('.hwp'); // 한글 파일 확장자
+
+    IconData iconData;
+    Color iconColor;
+
+    if (isPdf) {
+      iconData = Icons.picture_as_pdf;
+      iconColor = Colors.red;
+    } else if (isExcel) {
+      iconData = Icons.insert_chart; // Excel 파일 아이콘
+      iconColor = Colors.green;
+    } else if (isPpt) {
+      iconData = Icons.slideshow; // PowerPoint 파일 아이콘
+      iconColor = Colors.orange;
+    } else if (isDocx) {
+      iconData = Icons.description; // Word 파일 아이콘
+      iconColor = Colors.blue;
+    } else if (isHwp) {
+      iconData = Icons.description; // 한글 파일 아이콘 (별도의 아이콘이 없으므로 기본 아이콘 사용)
+      iconColor = Colors.lightBlue;
+    } else {
+      iconData = Icons.insert_drive_file; // 기본 파일 아이콘
+      iconColor = Colors.grey;
+    }
 
     return GestureDetector(
       onTap: () {
-        if (isPdf) {
-          _openMediaViewer(filePath, index, true);
-        } else {
-          _downloadFile(filePath, fileName);
-        }
+        OpenFile.open(filePath);
       },
       child: Container(
         margin: EdgeInsets.symmetric(vertical: 8.0),
         padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         decoration: BoxDecoration(
           color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(58.0),
+          borderRadius: BorderRadius.circular(8.0),
         ),
         child: Row(
           children: [
-            Icon(isPdf ? Icons.picture_as_pdf : Icons.insert_drive_file,
-                color: isPdf ? Colors.red : Colors.grey[700]),
+            Icon(
+              iconData,
+              color: iconColor,
+            ),
             SizedBox(width: 16.0),
             Expanded(
               child: Text(
@@ -1373,14 +1390,30 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            SizedBox(width: 15.0),
             IconButton(
               icon: Icon(Icons.download, color: Colors.grey),
               onPressed: () => _downloadFile(filePath, fileName),
+            ),
+            IconButton(
+              onPressed: () => _deleteFile(filePath, realIndex),
+              icon: Icon(Icons.delete, color: Colors.grey),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _deleteFile(String filePath, int index) {
+    setState(() {
+      // 리스트의 길이와 인덱스가 일치하는지 확인
+      if (index >= 0 && index < _filePaths.length) {
+        _filePaths.removeAt(index); // 리스트에서 파일 경로 제거
+      } else {
+        print('Error: Index $index is out of range.');
+      }
+    });
   }
 
   Future<void> _downloadFile(String filePath, String fileName) async {
@@ -1450,7 +1483,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         filePath.endsWith('.MOV') ||
         filePath.endsWith('.mov');
     final isAudio = filePath.endsWith('.m4a') || filePath.endsWith('.aac');
-    final isPdf = filePath.endsWith('.pdf');
 
     return GestureDetector(
       onTap: () {
@@ -1480,10 +1512,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       : isAudio
                           ? Icon(Icons.audiotrack,
                               size: 50, color: Colors.black)
-                          : isPdf
-                              ? Icon(Icons.picture_as_pdf,
-                                  size: 50, color: Colors.red)
-                              : Image.file(File(filePath), fit: BoxFit.cover),
+                          : Image.file(File(filePath), fit: BoxFit.cover),
                 ),
               ),
             ),
@@ -1510,7 +1539,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return PopScope(
       onPopInvoked: (bool value) async {
@@ -1656,7 +1684,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   children:
                                       List.generate(_filePaths.length, (index) {
                                     return _buildFileTile(_filePaths[index],
-                                        index + _mediaPaths.length);
+                                        index + _mediaPaths.length, index);
                                   }),
                                 ),
                               ),
