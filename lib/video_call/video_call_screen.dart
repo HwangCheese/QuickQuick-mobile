@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -6,17 +7,22 @@ import 'package:sticker_memo/socket_service.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:http/http.dart' as http;
 
 import '../../globals.dart';
 
 class VideoCallScreen extends StatefulWidget {
+  final List<String> selectedFriendNames;
+
+  VideoCallScreen({required this.selectedFriendNames});
+
   @override
   _VideoCallScreenState createState() => _VideoCallScreenState();
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen>
     with SingleTickerProviderStateMixin {
-  late WebViewController _webViewController; // WebViewController 선언
+  WebViewController? _webViewController; // WebViewController를 nullable로 설정
   late IO.Socket _socket;
   String roomId = '';
 
@@ -27,49 +33,64 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     _initializeWebView();
   }
 
-  void _initializeWebView() {
+  Future<void> _initializeWebView() async {
     _renderRoomNumber();
-    _webViewController = WebViewController();
+    await _shareUrlWithFriends();
 
-    // URLRequest에 헤더 추가
-    _webViewController.loadRequest(
+    final webViewController = WebViewController();
+
+    webViewController.loadRequest(
       Uri.parse(
           'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId'),
-      // headers: {
-      //   'ngrok-skip-browser-warning': '1', // ngrok 헤더 추가
-      // },
     );
 
-    _webViewController.setJavaScriptMode(JavaScriptMode.unrestricted);
-    _webViewController.addJavaScriptChannel(
+    webViewController.setJavaScriptMode(JavaScriptMode.unrestricted);
+    webViewController.addJavaScriptChannel(
       'Flutter',
       onMessageReceived: (JavaScriptMessage message) {
-        // JavaScript에서 전달된 메시지를 Flutter에서 처리
         print(message.message);
       },
     );
 
-    if (_webViewController.platform is AndroidWebViewController) {
+    if (webViewController.platform is AndroidWebViewController) {
       AndroidWebViewController.enableDebugging(true);
-      (_webViewController.platform as AndroidWebViewController)
+      (webViewController.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    // WebViewController를 상태에 설정
+    setState(() {
+      _webViewController = webViewController;
+    });
+  }
+
+  Future<void> _shareUrlWithFriends() async {
+    try {
+      for (String friendUserName in widget.selectedFriendNames) {
+        final url = Uri.parse('$SERVER_IP/invite');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'sourceUserName': USER_NAME,
+            'targetUserName': friendUserName,
+            'inviteUrl':
+                'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId',
+          }),
+        );
+
+        if (response.statusCode != 200) {
+          print('링크 공유 실패: ${response.statusCode}');
+          return;
+        }
+      }
+
+      print('링크 공유 성공');
+    } catch (e) {
+      print('링크 공유 중 오류가 발생했습니다.');
     }
   }
 
-  void _inviteFriendsForVideoCall(
-      List<String> selectedFriendIds, String roomId) {
-    final data = {
-      'inviterId': USER_ID, // 현재 사용자 ID
-      'inviterName': USER_NAME, // 현재 사용자 이름
-      'friendIds': selectedFriendIds, // 초대할 친구들의 ID 리스트
-      'roomId': roomId, // 화상 통화 방 ID
-    };
-
-    // 소켓을 통해 친구들에게 초대 요청 전송
-    _socket.emit('invite_friends', data);
-  }
-
-  // 방 번호 렌더링 및 방 참여
   void _renderRoomNumber() {
     final random = Random();
     roomId = random.nextInt(10000000).toString();
@@ -82,7 +103,11 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         title: Text('Video Conference'),
       ),
       body: SafeArea(
-        child: WebViewWidget(controller: _webViewController),
+        child: _webViewController == null
+            ? Center(
+                child:
+                    CircularProgressIndicator()) // WebViewController 초기화 전 로딩 스피너 표시
+            : WebViewWidget(controller: _webViewController!),
       ),
     );
   }
