@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login/login_screen.dart';
-import 'home/home_screen.dart';
+import 'package:sticker_memo/screens/login/login_screen.dart';
+import 'package:sticker_memo/screens/home/home_screen.dart';
 import 'globals.dart';
 
 void main() async {
@@ -29,6 +30,8 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final Widget initialScreen;
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   const MyApp({super.key, required this.initialScreen});
 
@@ -46,6 +49,7 @@ class MyApp extends StatelessWidget {
       supportedLocales: [
         const Locale('ko', 'KR'),
       ],
+      navigatorKey: navigatorKey,
       home: initialScreen,
     );
   }
