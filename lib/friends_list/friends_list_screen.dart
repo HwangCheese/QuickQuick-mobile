@@ -37,26 +37,22 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
 
     if (response.statusCode == 200) {
       try {
-        // 서버에서 받은 데이터의 구조 확인
         final List<dynamic> data = json.decode(response.body);
 
         setState(() {
-          // 친구 목록 업데이트
           friends = data.map<Map<String, String>>((friend) {
-            // 'friend_name_set' 필드가 실제 서버 데이터에 맞는지 확인 필요
             return {
               'user_name': friend['friend_name_set'] ?? '',
             };
           }).toList();
 
-          filteredFriends = List.from(friends); // filteredFriends 갱신
+          filteredFriends = List.from(friends);
         });
       } catch (e) {
         print('JSON Parsing Error: $e');
         _showMessage('서버 응답 처리 중 오류 발생');
       }
     } else {
-      // 오류 처리
       _showMessage('친구 목록을 불러오는 데 실패했습니다.');
     }
   }
@@ -106,12 +102,11 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     try {
       if (response.statusCode == 200) {
         setState(() {
-          // 친구 이름을 업데이트한 후, 데이터 상태를 갱신
           final friendIndex = friends
               .indexWhere((friend) => friend['user_name'] == oldFriendUserName);
           if (friendIndex != -1) {
             friends[friendIndex]['user_name'] = newFriendUserName;
-            filteredFriends = List.from(friends); // UI 업데이트를 위해 새 리스트로 설정
+            filteredFriends = List.from(friends);
           }
         });
       } else {
@@ -130,7 +125,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
 
     final requestBody = jsonEncode({
       'user_name': USER_NAME,
-      'friend_name_set': friendUserName, // friend_name_set으로 수정
+      'friend_name_set': friendUserName,
     });
 
     final response = await http.delete(
@@ -145,7 +140,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     if (response.statusCode == 200) {
       setState(() {
         friends.removeWhere((friend) => friend['user_name'] == friendUserName);
-        filteredFriends = friends; // UI 업데이트
+        filteredFriends = friends;
       });
     } else {
       final errorMessage =
@@ -262,6 +257,33 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     );
   }
 
+  Future<void> _kockFriend(String friendUserName) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$SERVER_IP/kock'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'sourceUserName': USER_NAME, // 요청을 보낸 사용자
+          'targetUserName': friendUserName, // 요청을 받는 친구
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        _showMessage('$friendUserName 님을 쿡 찔렀습니다!');
+      } else {
+        final errorMessage =
+            json.decode(response.body)['error'] ?? '알 수 없는 오류 발생';
+        _showMessage('쿡 요청 실패: $errorMessage');
+      }
+    } catch (e) {
+      _showMessage('쿡 요청 중 오류 발생: $e');
+    }
+  }
+
+  void _showDoubleTapMessage(String friendUserName) {
+    _kockFriend(friendUserName); // 서버에 콕 요청을 보냄
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -317,11 +339,18 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                 child: ListView.builder(
                   itemCount: filteredFriends.length,
                   itemBuilder: (context, index) {
-                    return ListTile(
-                      title: Text(filteredFriends[index]['user_name']!),
-                      onLongPress: () {
-                        _showActionDialog(filteredFriends[index]['user_name']!);
+                    return GestureDetector(
+                      onDoubleTap: () {
+                        _showDoubleTapMessage(
+                            filteredFriends[index]['user_name']!);
                       },
+                      child: ListTile(
+                        title: Text(filteredFriends[index]['user_name']!),
+                        onLongPress: () {
+                          _showActionDialog(
+                              filteredFriends[index]['user_name']!);
+                        },
+                      ),
                     );
                   },
                 ),
