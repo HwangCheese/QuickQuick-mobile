@@ -115,19 +115,93 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  Future<void> _updateEvent(
-      DateTime date, String oldDescription, String newDescription) async {
-    // 일정 업데이트를 위한 API 요청 로직을 작성할 수 있습니다.
-    // ...
+  Future<void> _deleteEvent(DateTime date, String description) async {
+    try {
+      // 이벤트 ID를 가져오는 로직 추가 (예: getEventIdFromDescription)
+      final eventId = await getEventIdFromDescription(description);
+      if (eventId == null) {
+        throw Exception('이벤트 ID를 찾을 수 없습니다.');
+      }
+
+      final response = await http.delete(
+        Uri.parse('$SERVER_IP/events/$eventId'),
+      );
+
+      if (response.statusCode == 200) {
+        print('Event deleted successfully');
+        await _loadEvents(); // 이벤트 삭제 후 다시 로드
+      } else {
+        throw Exception('Failed to delete event: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error deleting event: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete event: $e')),
+      );
+    }
   }
 
-  Future<void> _deleteEvent(DateTime date, String description) async {
-    // 일정 삭제를 위한 API 요청 로직을 작성할 수 있습니다.
-    // ...
+  Future<void> _updateEvent(
+      DateTime date, String oldDescription, String newDescription) async {
+    try {
+      // 이벤트 ID를 가져오는 로직 추가 (예: getEventIdFromDescription)
+      final eventId = await getEventIdFromDescription(oldDescription);
+      if (eventId == null) {
+        throw Exception('이벤트 ID를 찾을 수 없습니다.');
+      }
+
+      final formattedDateTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
+
+      final response = await http.put(
+        Uri.parse('$SERVER_IP/events/$eventId'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(<String, String>{
+          'event_datetime': formattedDateTime,
+          'description': newDescription,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('Event updated successfully');
+        await _loadEvents(); // 이벤트 업데이트 후 다시 로드
+      } else {
+        throw Exception('Failed to update event: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error updating event: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update event: $e')),
+      );
+    }
+  }
+
+  Future<String?> getEventIdFromDescription(String description) async {
+    try {
+      final response =
+          await http.get(Uri.parse('$SERVER_IP/events/' + USER_ID));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        for (var item in data) {
+          // Assume the 'description' and 'event_id' keys exist in the API response
+          if (item['description'] == description) {
+            return item['event_id']; // Return the matched event ID
+          }
+        }
+        return null; // No matching description found
+      } else {
+        throw Exception('Failed to fetch events: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching event ID: $e');
+      return null;
+    }
   }
 
   bool _isEventLine(String line) {
-    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
+    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일 (\d{1,2})시\s+(.+)');
     return pattern.hasMatch(line);
   }
 
@@ -159,7 +233,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _processEventLine(String line) {
-    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
+    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일 (\d{1,2})시\s+(.+)');
     Match? match = pattern.firstMatch(line);
 
     if (match != null) {
@@ -237,30 +311,80 @@ class _CalendarScreenState extends State<CalendarScreen> {
     TextEditingController _controller =
         TextEditingController(text: oldDescription);
 
+    TimeOfDay selectedTime = TimeOfDay.fromDateTime(date);
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('일정 수정'),
-          content: TextField(
-            controller: _controller,
-            decoration: InputDecoration(labelText: '일정 내용'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('취소'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _updateEvent(date, oldDescription, _controller.text);
-              },
-              child: Text('저장'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('일정 수정'),
+              content: SizedBox(
+                width: double.maxFinite, // Ensure the dialog uses full width
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(labelText: '일정 내용'),
+                    ),
+                    SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '시간: ${selectedTime.format(context)}',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final TimeOfDay? pickedTime = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime,
+                            );
+                            if (pickedTime != null &&
+                                pickedTime != selectedTime) {
+                              setState(() {
+                                selectedTime = pickedTime;
+                              });
+                            }
+                          },
+                          child: Text('시간 선택'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('취소'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final updatedDateTime = DateTime(
+                      date.year,
+                      date.month,
+                      date.day,
+                      selectedTime.hour,
+                      selectedTime.minute,
+                    );
+
+                    Navigator.of(context).pop();
+                    _updateEvent(
+                        updatedDateTime, oldDescription, _controller.text);
+                  },
+                  child: Text('저장'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
