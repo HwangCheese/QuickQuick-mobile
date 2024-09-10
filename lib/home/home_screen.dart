@@ -106,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (originalIndex != -1) {
           datas.removeWhere(
-                  (data) => data['originalIndex'] == originalIndex.toString());
+              (data) => data['originalIndex'] == originalIndex.toString());
 
           List<Map<String, dynamic>> memoItems = [];
 
@@ -291,9 +291,10 @@ class _HomeScreenState extends State<HomeScreen> {
           String memoTitle = memo['title'].toLowerCase();
           int originalIndex = memos.indexOf(memo);
 
-          String? memoText = memoTexts.isNotEmpty && memoTexts.length > originalIndex
-              ? memoTexts[originalIndex].toLowerCase()
-              : "";
+          String? memoText =
+              memoTexts.isNotEmpty && memoTexts.length > originalIndex
+                  ? memoTexts[originalIndex].toLowerCase()
+                  : "";
 
           return memoTitle.contains(query) || memoText.contains(query);
         }).toList();
@@ -368,9 +369,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-        'user_name': friend['friend_name_set'],
-        'user_id': friend['friend_id'],
-      })
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
           .toList();
 
       List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
@@ -392,7 +393,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (allSelected) {
                             selectedFriendIds.clear();
                           } else {
-                            selectedFriendIds = friends.map((friend) => friend['user_id']!).toList();
+                            selectedFriendIds = friends
+                                .map((friend) => friend['user_id']!)
+                                .toList();
                           }
                           allSelected = !allSelected;
                         });
@@ -409,13 +412,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       return CheckboxListTile(
                         title: Text(friends[index]['user_name']!),
-                        value: selectedFriendIds.contains(friends[index]['user_id']),
+                        value: selectedFriendIds
+                            .contains(friends[index]['user_id']),
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
                               selectedFriendIds.add(friends[index]['user_id']!);
                             } else {
-                              selectedFriendIds.remove(friends[index]['user_id']);
+                              selectedFriendIds
+                                  .remove(friends[index]['user_id']);
                             }
                           });
                         },
@@ -433,7 +438,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).pop(); // 팝업 닫기
-                      _shareMemoWithFriends(selectedFriendIds, memoId); // memoId 전달
+                      _shareMemoWithFriends(
+                          selectedFriendIds, memoId); // memoId 전달
                     },
                     child: Text('전송'),
                   ),
@@ -460,9 +466,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-        'user_name': friend['friend_name_set'],
-        'user_id': friend['friend_id'],
-      })
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
           .toList();
 
       List<String> selectedFriendIds = [];
@@ -484,7 +490,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (allSelected) {
                             selectedFriendIds.clear();
                           } else {
-                            selectedFriendIds = friends.map((friend) => friend['user_id']!).toList();
+                            selectedFriendIds = friends
+                                .map((friend) => friend['user_id']!)
+                                .toList();
                           }
                           allSelected = !allSelected;
                         });
@@ -501,13 +509,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       return CheckboxListTile(
                         title: Text(friends[index]['user_name']!),
-                        value: selectedFriendIds.contains(friends[index]['user_id']),
+                        value: selectedFriendIds
+                            .contains(friends[index]['user_id']),
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
                               selectedFriendIds.add(friends[index]['user_id']!);
                             } else {
-                              selectedFriendIds.remove(friends[index]['user_id']);
+                              selectedFriendIds
+                                  .remove(friends[index]['user_id']);
                             }
                           });
                         },
@@ -525,7 +535,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).pop(); // 팝업 닫기
-                      _shareSelectedMemosWithFriends(selectedFriendIds); // 선택된 메모들을 공유
+                      _shareSelectedMemosWithFriends(
+                          selectedFriendIds); // 선택된 메모들을 공유
                     },
                     child: Text('전송'),
                   ),
@@ -690,9 +701,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       datas.sort((a, b) {
         int indexA = memos.indexWhere(
-                (memo) => memo['memo_id'] == a['data'].first['memo_id']);
+            (memo) => memo['memo_id'] == a['data'].first['memo_id']);
         int indexB = memos.indexWhere(
-                (memo) => memo['memo_id'] == b['data'].first['memo_id']);
+            (memo) => memo['memo_id'] == b['data'].first['memo_id']);
         return indexA.compareTo(indexB);
       });
 
@@ -702,7 +713,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       for (var data in datas) {
         int index = memos.indexWhere(
-                (memo) => memo['memo_id'] == data['data'].first['memo_id']);
+            (memo) => memo['memo_id'] == data['data'].first['memo_id']);
         data['originalIndex'] = index.toString();
       }
     });
@@ -770,7 +781,7 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedMemos.clear();
       } else {
         selectedMemos =
-        Set<int>.from(List<int>.generate(memos.length, (index) => index));
+            Set<int>.from(List<int>.generate(memos.length, (index) => index));
       }
     });
   }
@@ -793,9 +804,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-        'user_name': friend['friend_name_set'],
-        'user_id': friend['friend_id'],
-      })
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
           .toList();
 
       List<String> selectedFriendNames = []; // 선택된 친구 이름을 저장하는 리스트
@@ -817,7 +828,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (allSelected) {
                             selectedFriendNames.clear();
                           } else {
-                            selectedFriendNames = friends.map((friend) => friend['user_name']!).toList();
+                            selectedFriendNames = friends
+                                .map((friend) => friend['user_name']!)
+                                .toList();
                           }
                           allSelected = !allSelected;
                         });
@@ -834,13 +847,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       return CheckboxListTile(
                         title: Text(friends[index]['user_name']!),
-                        value: selectedFriendNames.contains(friends[index]['user_name']),
+                        value: selectedFriendNames
+                            .contains(friends[index]['user_name']),
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
-                              selectedFriendNames.add(friends[index]['user_name']!);
+                              selectedFriendNames
+                                  .add(friends[index]['user_name']!);
                             } else {
-                              selectedFriendNames.remove(friends[index]['user_name']);
+                              selectedFriendNames
+                                  .remove(friends[index]['user_name']);
                             }
                           });
                         },
@@ -862,8 +878,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              VideoCallScreen(selectedFriendNames: selectedFriendNames),
+                          builder: (context) => VideoCallScreen(
+                              selectedFriendNames: selectedFriendNames),
                         ),
                       );
                     },
@@ -880,13 +896,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _getFirstMedia(List<Map<String, dynamic>> memoDatas) async {
+  Future<Map<String, dynamic>?> _getFirstMedia(
+      List<Map<String, dynamic>> memoDatas) async {
     Map<String, dynamic>? firstMedia;
 
     if (memoDatas.isNotEmpty) {
       // 첫 번째로 텍스트 포맷을 찾음
       firstMedia = memoDatas.firstWhere(
-            (data) => data['format'] == 'txt',
+        (data) => data['format'] == 'txt',
         orElse: () => {},
       );
 
@@ -896,8 +913,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (textData == null || textData.isEmpty) {
           // 텍스트가 비어있으면 이미지나 비디오를 다시 찾음
           firstMedia = memoDatas.firstWhere(
-                (data) =>
-            data['format'] == 'jpg' ||
+            (data) =>
+                data['format'] == 'jpg' ||
                 data['format'] == 'png' ||
                 data['format'] == 'jpeg' ||
                 data['format'] == 'mp4' ||
@@ -908,8 +925,8 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         // 텍스트가 없을 경우 바로 이미지나 비디오 포맷을 찾음
         firstMedia = memoDatas.firstWhere(
-              (data) =>
-          data['format'] == 'jpg' ||
+          (data) =>
+              data['format'] == 'jpg' ||
               data['format'] == 'png' ||
               data['format'] == 'jpeg' ||
               data['format'] == 'mp4' ||
@@ -933,13 +950,13 @@ class _HomeScreenState extends State<HomeScreen> {
           preferredSize: Size.fromHeight(kToolbarHeight),
           child: AppBar(
             title:
-            isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
+                isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
             backgroundColor: Colors.transparent,
             leading: isSelectionMode
                 ? IconButton(
-              icon: Icon(Icons.close),
-              onPressed: _toggleSelectionMode,
-            )
+                    icon: Icon(Icons.close),
+                    onPressed: _toggleSelectionMode,
+                  )
                 : null,
             actions: [
               if (isSelectionMode) ...[
@@ -956,24 +973,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _deleteSelectedMemos,
                 ),
               ],
-              IconButton(
-                icon: Icon(Icons.video_call_outlined),
-                onPressed: _showFriendSelectionDialogForVideoCall,
-              ),
-              IconButton(
-                icon: Icon(Icons.logout),
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('token');
-                  await prefs.remove('userId');
-                  await prefs.remove('userName');
+              if (!isSelectionMode) ...[
+                IconButton(
+                  icon: Icon(Icons.video_call_outlined),
+                  onPressed: _showFriendSelectionDialogForVideoCall,
+                ),
+                IconButton(
+                  icon: Icon(Icons.logout),
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.remove('token');
+                    await prefs.remove('userId');
+                    await prefs.remove('userName');
 
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => Login()),
-                  );
-                },
-              ),
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => Login()),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -1011,7 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                         itemBuilder: (BuildContext context) =>
-                        <PopupMenuEntry<int>>[
+                            <PopupMenuEntry<int>>[
                           const PopupMenuItem<int>(
                             value: 0,
                             child: Text('선택'),
@@ -1058,7 +1077,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     suffixIcon:
-                    Icon(Icons.search, color: Colors.grey), // 검색 아이콘
+                        Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                   ),
                 ),
                 SizedBox(height: 16.0),
@@ -1070,22 +1089,33 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
                     ),
-                    itemCount: filteredMemos.isEmpty && _searchController.text.isEmpty ? memos.length : filteredMemos.length,
+                    itemCount:
+                        filteredMemos.isEmpty && _searchController.text.isEmpty
+                            ? memos.length
+                            : filteredMemos.length,
                     itemBuilder: (context, index) {
-                      var currentMemos = filteredMemos.isEmpty && _searchController.text.isEmpty ? memos : filteredMemos;
+                      var currentMemos = filteredMemos.isEmpty &&
+                              _searchController.text.isEmpty
+                          ? memos
+                          : filteredMemos;
                       bool isSelected = selectedMemos.contains(index);
 
                       List<Map<String, dynamic>> memoDatas = datas
-                          .where((data) => data['originalIndex'] == index.toString())
+                          .where((data) =>
+                              data['originalIndex'] == index.toString())
                           .expand((data) => data['data'])
-                          .map<Map<String, dynamic>>((item) => item as Map<String, dynamic>)
+                          .map<Map<String, dynamic>>(
+                              (item) => item as Map<String, dynamic>)
                           .toList();
 
                       FutureBuilder<Map<String, dynamic>?>(
                         future: _getFirstMedia(memoDatas),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.done) {
-                            if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.done) {
+                            if (snapshot.hasData &&
+                                snapshot.data != null &&
+                                snapshot.data!.isNotEmpty) {
                               final firstMedia = snapshot.data!;
                               return FutureBuilder<Widget>(
                                 future: _getDataWidget(
@@ -1095,7 +1125,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   index,
                                 ),
                                 builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.done) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.done) {
                                     if (snapshot.hasData) {
                                       return snapshot.data!;
                                     } else {
@@ -1107,7 +1138,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               );
                             } else {
-                              return Text('내용 없음', style: TextStyle(fontSize: 16.0));
+                              return Text('내용 없음',
+                                  style: TextStyle(fontSize: 16.0));
                             }
                           } else {
                             return CircularProgressIndicator();
@@ -1126,14 +1158,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8.0),
                                 border: Border.all(color: Colors.grey),
-                                color: currentMemos[index]['color'] ?? Colors.white,
+                                color: currentMemos[index]['color'] ??
+                                    Colors.white,
                               ),
                               child: Center(
                                 child: FutureBuilder<Map<String, dynamic>?>(
                                   future: _getFirstMedia(memoDatas),
                                   builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.done) {
-                                      if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.done) {
+                                      if (snapshot.hasData &&
+                                          snapshot.data != null &&
+                                          snapshot.data!.isNotEmpty) {
                                         final firstMedia = snapshot.data!;
                                         return FutureBuilder<Widget>(
                                           future: _getDataWidget(
@@ -1143,11 +1179,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                             index,
                                           ),
                                           builder: (context, snapshot) {
-                                            if (snapshot.connectionState == ConnectionState.done) {
+                                            if (snapshot.connectionState ==
+                                                ConnectionState.done) {
                                               if (snapshot.hasData) {
                                                 return snapshot.data!;
                                               } else {
-                                                return const Text('데이터를 불러올 수 없습니다.');
+                                                return const Text(
+                                                    '데이터를 불러올 수 없습니다.');
                                               }
                                             } else {
                                               return const CircularProgressIndicator();
@@ -1155,7 +1193,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           },
                                         );
                                       } else {
-                                        return const Text('내용 없음', style: TextStyle(fontSize: 16.0));
+                                        return const Text('내용 없음',
+                                            style: TextStyle(fontSize: 16.0));
                                       }
                                     } else {
                                       return const CircularProgressIndicator();
@@ -1181,17 +1220,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: isSelected ? Colors.blue[400] : Colors.white,
+                                    color: isSelected
+                                        ? Colors.blue[400]
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: isSelected ? Colors.transparent : Colors.grey,
+                                      color: isSelected
+                                          ? Colors.transparent
+                                          : Colors.grey,
                                       width: 2,
                                     ),
                                   ),
                                   child: Icon(
                                     Icons.check,
                                     size: 16,
-                                    color: isSelected ? Colors.white : Colors.transparent,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.transparent,
                                   ),
                                 ),
                               ),
