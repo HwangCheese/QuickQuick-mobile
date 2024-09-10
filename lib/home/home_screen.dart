@@ -334,6 +334,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _reindexMemoTexts() {
+    // 새로운 인덱스 순서대로 정렬
+    final sortedEntries = memoTexts.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key)); // 기존 인덱스 순서대로 정렬
+
+    // 새로운 인덱스를 할당
+    memoTexts = {};
+    int newIndex = 0;
+    for (var entry in sortedEntries) {
+      memoTexts[newIndex++] = entry.value;
+    }
+  }
+
   void _showMenu(BuildContext context, int index) {
     String memoId = memos[index]['memo_id']; // memoId 가져오기
 
@@ -367,6 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     memoTexts.remove(index);
                     _deleteMemoFromServer(memoId);
                     memos.removeAt(index);
+                    _reindexMemoTexts();
                     _fetchMemos();
                   });
                   Navigator.pop(context);
@@ -393,6 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       print('메모 삭제 실패: ${response.statusCode}');
     }
+    _fetchMemos();
   }
 
   Future<void> _showFriendSelectionDialog(String memoId) async {
@@ -825,11 +840,12 @@ class _HomeScreenState extends State<HomeScreen> {
         memoTexts.remove(index);
         _deleteMemoFromServer(memoId);
       });
-
+      _reindexMemoTexts();
       _fetchMemos();
       selectedMemos.clear();
       isSelectionMode = false;
     });
+    _fetchMemos();
   }
 
   Future<void> _showFriendSelectionDialogForVideoCall() async {
