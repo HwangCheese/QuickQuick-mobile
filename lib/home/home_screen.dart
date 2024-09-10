@@ -332,9 +332,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: Text('삭제'),
                 onTap: () {
                   setState(() {
+                    memoTexts.removeAt(index);
                     _deleteMemoFromServer(memoId);
                     memos.removeAt(index);
-                    memoTexts.removeAt(index);
                     _fetchMemos();
                   });
                   Navigator.pop(context);
@@ -790,9 +790,11 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       selectedMemos.forEach((index) {
         String memoId = memos[index]['memo_id'];
+        memoTexts.removeAt(index);
         _deleteMemoFromServer(memoId);
-        _fetchMemos();
       });
+
+      _fetchMemos();
       selectedMemos.clear();
       isSelectionMode = false;
     });
