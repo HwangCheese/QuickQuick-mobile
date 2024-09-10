@@ -913,6 +913,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   Navigator.pop(context);
                   final result = await FilePicker.platform.pickFiles(
                     type: FileType.any,
+                    allowMultiple: true,
                   );
                   if (result != null) {
                     setState(() {
@@ -1712,6 +1713,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
                                       hintText: '메모를 입력하세요...',
+                                      contentPadding: EdgeInsets.only(
+                                          left: 16.0), // 왼쪽 여백 추가
                                     ),
                                     style: TextStyle(
                                       fontSize: 16.0,
