@@ -24,12 +24,13 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> memos = [];
   List<Map<String, dynamic>> datas = [];
   List<Map<String, dynamic>> filteredMemos = [];
-  List<String> memoTexts = [];
+  Map<int, String> memoTexts = {};
+  Map<String, Map<String, dynamic>> memoDetailsMap = {};
   List<VideoPlayerController?> _homeVideoControllers = [];
   bool isSelectionMode = false;
   Set<int> selectedMemos = Set<int>();
   Uint8List? imageData;
-  int count = 0;
+  int index = 0;
   final TextEditingController _searchController = TextEditingController();
   final SocketService _socketService = SocketService();
 
@@ -52,39 +53,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchMemos() async {
-    count = 0;
+    index = 0;
     setState(() {
       datas.clear();
+      memoDetailsMap.clear();
     });
 
     final url = Uri.parse('$SERVER_IP/memo/$USER_ID');
     try {
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
         final List<dynamic> memo = json.decode(response.body);
-        List<Future<void>> fetchDetailFutures = [];
         setState(() {
           memos = memo.map((item) {
             String memoId = item['memo_id'];
-            fetchDetailFutures.add(_fetchMemoDetails(memoId)); // 비동기 작업 리스트에 추가
             return {
               'color': colorMap[item['theme']] ?? Colors.white,
               'isPinned': false,
               'memo_id': memoId,
-              'timestamp': DateTime.parse(item['date']), // 작성 시간 추가
-              'title': item['title']
+              'timestamp': DateTime.parse(item['date']),
+              'title': item['title'],
+              'originalIndex': index++, // 원래 인덱스를 저장
             };
           }).toList();
         });
 
-        print(memos);
-        await Future.wait(fetchDetailFutures); // 모든 비동기 작업이 완료될 때까지 기다림
+        // Fetch details
+        List<Future<void>> fetchDetailFutures = [];
+        for (var item in memos) {
+          String memoId = item['memo_id'];
+          fetchDetailFutures.add(_fetchMemoDetails(memoId));
+        }
+
+        await Future.wait(fetchDetailFutures);
+
+        // 정렬된 리스트를 얻고 Map을 다시 생성
+        List<MapEntry<int, String>> sortedEntries = memoTexts.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key));
+
+        memoTexts = Map.fromEntries(sortedEntries);
       } else {
         print('Failed to load memos: ${response.statusCode}');
       }
     } catch (e) {
       print('Failed to load memos: $e');
     }
+
     print(memoTexts);
     _filterMemos();
   }
@@ -93,37 +108,26 @@ class _HomeScreenState extends State<HomeScreen> {
     final url = Uri.parse('$SERVER_IP/memo/$memoId/data');
     try {
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
         final List<dynamic> memoData = json.decode(response.body);
-        int originalIndex = -1;
+        List<Map<String, dynamic>> memoItems = [];
 
-        for (var item in memos) {
-          if (item['memo_id'] == memoId) {
-            originalIndex = memos.indexOf(item);
-            break;
-          }
-        }
-
-        if (originalIndex != -1) {
-          datas.removeWhere(
-              (data) => data['originalIndex'] == originalIndex.toString());
-
-          List<Map<String, dynamic>> memoItems = [];
-
-          for (var item in memoData) {
-            memoItems.add({
-              'memo_id': item['memo_id'],
-              'data_id': item['data_id'],
-              'format': item['format'],
-              'content_type': item['content_type'],
-            });
-          }
-
-          datas.add({
-            'originalIndex': originalIndex.toString(),
-            'data': memoItems,
+        for (var item in memoData) {
+          memoItems.add({
+            'memo_id': item['memo_id'],
+            'data_id': item['data_id'],
+            'format': item['format'],
+            'content_type': item['content_type'],
           });
         }
+
+        memoDetailsMap[memoId] = {
+          'data': memoItems,
+        };
+
+        // Trigger UI update
+        _updateMemos();
       } else {
         print('Failed to load memo datas: ${response.statusCode}');
       }
@@ -132,12 +136,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _updateMemos() {
+    setState(() {
+      for (var memo in memos) {
+        final memoId = memo['memo_id'];
+        if (memoDetailsMap.containsKey(memoId)) {
+          final memoData = memoDetailsMap[memoId]!['data'];
+
+          // originalIndex에 해당하는 데이터가 있는지 확인
+          int existingIndex = datas.indexWhere(
+            (data) => data['originalIndex'] == memo['originalIndex'].toString(),
+          );
+
+          if (existingIndex != -1) {
+            // 기존 데이터를 수정
+            datas[existingIndex]['data'] = memoData;
+          } else {
+            // 새로운 데이터를 추가
+            datas.add({
+              'originalIndex': memo['originalIndex'].toString(),
+              'data': memoData,
+            });
+          }
+        }
+      }
+    });
+  }
+
   Future<Widget> _getDataWidget(
       String title, String dataId, String format, int index) async {
     if (format == 'txt' && title != "미디어 메모") {
       // 메모에 텍스트가 있을 경우
       return FutureBuilder<String?>(
-        future: _getData(dataId),
+        future: _getData(dataId, index),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             if (snapshot.hasData) {
@@ -217,13 +248,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<String?> _getData(String dataId) async {
+  Future<String?> _getData(String dataId, int index) async {
     final url = Uri.parse("$SERVER_IP/data/$dataId/file");
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         String text = utf8.decode(response.bodyBytes);
-        if (!memoTexts.contains(text)) memoTexts.add(text);
+        if (!memoTexts.containsKey(index)) {
+          memoTexts[index] = text;
+        }
         return text;
       } else {
         print('파일 불러오기 실패: ${response.statusCode}');
@@ -291,10 +324,9 @@ class _HomeScreenState extends State<HomeScreen> {
           String memoTitle = memo['title'].toLowerCase();
           int originalIndex = memos.indexOf(memo);
 
-          String? memoText =
-              memoTexts.isNotEmpty && memoTexts.length > originalIndex
-                  ? memoTexts[originalIndex].toLowerCase()
-                  : "";
+          String? memoText = memoTexts.containsKey(originalIndex)
+              ? memoTexts[originalIndex]!.toLowerCase()
+              : "";
 
           return memoTitle.contains(query) || memoText.contains(query);
         }).toList();
@@ -332,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: Text('삭제'),
                 onTap: () {
                   setState(() {
-                    memoTexts.removeAt(index);
+                    memoTexts.remove(index);
                     _deleteMemoFromServer(memoId);
                     memos.removeAt(index);
                     _fetchMemos();
@@ -790,7 +822,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       selectedMemos.forEach((index) {
         String memoId = memos[index]['memo_id'];
-        memoTexts.removeAt(index);
+        memoTexts.remove(index);
         _deleteMemoFromServer(memoId);
       });
 
@@ -899,33 +931,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<Map<String, dynamic>?> _getFirstMedia(
-      List<Map<String, dynamic>> memoDatas) async {
-    Map<String, dynamic>? firstMedia;
+      List<Map<String, dynamic>> memoDatas, int index) async {
+    if (memoDatas.isEmpty) return null;
 
-    if (memoDatas.isNotEmpty) {
-      // 첫 번째로 텍스트 포맷을 찾음
-      firstMedia = memoDatas.firstWhere(
-        (data) => data['format'] == 'txt',
-        orElse: () => {},
-      );
+    // 첫 번째로 텍스트 포맷을 찾음
+    var firstMedia = memoDatas.firstWhere(
+      (data) => data['format'] == 'txt',
+      orElse: () => {}, // 빈 맵 대신 null 반환
+    );
 
-      // 텍스트 포맷이 있으면 내용을 비동기적으로 가져와서 확인
-      if (firstMedia.isNotEmpty) {
-        final textData = await _getData(firstMedia['data_id']);
-        if (textData == null || textData.isEmpty) {
-          // 텍스트가 비어있으면 이미지나 비디오를 다시 찾음
-          firstMedia = memoDatas.firstWhere(
-            (data) =>
-                data['format'] == 'jpg' ||
-                data['format'] == 'png' ||
-                data['format'] == 'jpeg' ||
-                data['format'] == 'mp4' ||
-                data['format'] == 'MOV',
-            orElse: () => {},
-          );
-        }
-      } else {
-        // 텍스트가 없을 경우 바로 이미지나 비디오 포맷을 찾음
+    // 텍스트 포맷이 있으면 내용을 비동기적으로 가져와서 확인
+    if (firstMedia != null) {
+      final textData = await _getData(firstMedia['data_id'], index);
+
+      if (textData == null || textData.isEmpty) {
+        // 텍스트가 비어있으면 이미지나 비디오를 다시 찾음
         firstMedia = memoDatas.firstWhere(
           (data) =>
               data['format'] == 'jpg' ||
@@ -933,9 +953,20 @@ class _HomeScreenState extends State<HomeScreen> {
               data['format'] == 'jpeg' ||
               data['format'] == 'mp4' ||
               data['format'] == 'MOV',
-          orElse: () => {},
+          orElse: () => {}, // 빈 맵 대신 null 반환
         );
       }
+    } else {
+      // 텍스트가 없을 경우 바로 이미지나 비디오 포맷을 찾음
+      firstMedia = memoDatas.firstWhere(
+        (data) =>
+            data['format'] == 'jpg' ||
+            data['format'] == 'png' ||
+            data['format'] == 'jpeg' ||
+            data['format'] == 'mp4' ||
+            data['format'] == 'MOV',
+        orElse: () => {}, // 빈 맵 대신 null 반환
+      );
     }
 
     return firstMedia;
@@ -1111,7 +1142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           .toList();
 
                       FutureBuilder<Map<String, dynamic>?>(
-                        future: _getFirstMedia(memoDatas),
+                        future: _getFirstMedia(memoDatas, index),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.done) {
@@ -1165,7 +1196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               child: Center(
                                 child: FutureBuilder<Map<String, dynamic>?>(
-                                  future: _getFirstMedia(memoDatas),
+                                  future: _getFirstMedia(memoDatas, index),
                                   builder: (context, snapshot) {
                                     if (snapshot.connectionState ==
                                         ConnectionState.done) {
