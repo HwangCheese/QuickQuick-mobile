@@ -913,7 +913,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   Navigator.pop(context);
                   final result = await FilePicker.platform.pickFiles(
                     type: FileType.any,
-                    allowMultiple: true,
                   );
                   if (result != null) {
                     setState(() {
@@ -1581,23 +1580,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           'assets/images/translate.png',
                           height: 40,
                         )),
-                  // IconButton(
-                  //   iconSize: 30.0,
-                  //   icon: const Icon(Icons.attach_file),
-                  //   onPressed: _pickImageOrFile,
-                  // ),
-                  // IconButton(
-                  //   iconSize: 30.0,
-                  //   icon: _isRecording
-                  //       ? Icon(Icons.stop, color: Colors.red)
-                  //       : Icon(CupertinoIcons.mic),
-                  //   onPressed: _isRecording ? _stopRecording : _startRecording,
-                  // ),
-                  // IconButton(
-                  //   iconSize: 30.0,
-                  //   icon: Icon(Icons.send_rounded, color: Colors.black),
-                  //   onPressed: _saveAndShareMemo,
-                  // ),
                 ],
               ),
             ),
