@@ -178,6 +178,13 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
+                _kockFriend(friendUserName); // 콕 찌르기 기능 추가
+              },
+              child: Text('콕'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
                 _showUpdateFriendDialog(friendUserName);
               },
               child: Text('수정'),
@@ -280,10 +287,6 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     }
   }
 
-  void _showDoubleTapMessage(String friendUserName) {
-    _kockFriend(friendUserName); // 서버에 콕 요청을 보냄
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -340,10 +343,6 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                   itemCount: filteredFriends.length,
                   itemBuilder: (context, index) {
                     return GestureDetector(
-                      onDoubleTap: () {
-                        _showDoubleTapMessage(
-                            filteredFriends[index]['user_name']!);
-                      },
                       child: ListTile(
                         title: Text(filteredFriends[index]['user_name']!),
                         onLongPress: () {
