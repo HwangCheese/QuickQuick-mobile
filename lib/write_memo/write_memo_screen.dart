@@ -167,12 +167,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       }
 
       // 이벤트 라인 확인 및 다이얼로그 표시
-      for (String line in lines) {
-        if (_isEventLine(line)) {
-          _showEventConfirmationDialog(line);
-          break;
-        }
-      }
+      // for (String line in lines) {
+      //   if (_isEventLine(line)) {
+      //     _showEventConfirmationDialog(line);
+      //     break;
+      //   }
+      // }
     });
   }
 
@@ -729,6 +729,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
                 _processEventLine(line);
+                Navigator.of(context)
+                    .popUntil((route) => route.isFirst); // 뒤로 가기 내비게이션
               },
             ),
           ],
@@ -1556,7 +1558,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               color: Colors.black,
               onPressed: () async {
                 await _saveMemoToServer();
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                String currentText = _controller.text;
+
+                if (_isEventLine(currentText)) {
+                  // Show confirmation dialog if the input is a valid event line
+                  _showEventConfirmationDialog(currentText);
+                } else {
+                  // If not a valid event line, navigate back immediately
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
               },
             ),
           ),
