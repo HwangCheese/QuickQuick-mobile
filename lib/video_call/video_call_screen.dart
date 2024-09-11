@@ -1,79 +1,57 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:sticker_memo/socket_service.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:http/http.dart' as http;
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../globals.dart';
 
 class VideoCallScreen extends StatefulWidget {
-  final List<String> selectedFriendNames;
+  final List<String> selectedFriendIds;
 
-  VideoCallScreen({required this.selectedFriendNames});
+  VideoCallScreen({required this.selectedFriendIds});
 
   @override
   _VideoCallScreenState createState() => _VideoCallScreenState();
 }
 
-class _VideoCallScreenState extends State<VideoCallScreen>
-    with SingleTickerProviderStateMixin {
-  WebViewController? _webViewController; // WebViewController를 nullable로 설정
+class _VideoCallScreenState extends State<VideoCallScreen> {
+  InAppWebViewController? _webViewController; // WebViewController를 nullable로 설정
   late IO.Socket _socket;
   String roomId = '';
+  late PullToRefreshController pullToRefreshController;
+  late ContextMenu contextMenu;
+  late Uri uri;
+  final GlobalKey webViewKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _socket = SocketService().socket!;
     _initializeWebView();
+    uri = Uri.parse(
+        'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId');
   }
 
   Future<void> _initializeWebView() async {
     _renderRoomNumber();
     await _shareUrlWithFriends();
-
-    final webViewController = WebViewController();
-
-    webViewController.loadRequest(
-      Uri.parse(
-          'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId'),
-    );
-
-    webViewController.setJavaScriptMode(JavaScriptMode.unrestricted);
-    webViewController.addJavaScriptChannel(
-      'Flutter',
-      onMessageReceived: (JavaScriptMessage message) {
-        print(message.message);
-      },
-    );
-
-    if (webViewController.platform is AndroidWebViewController) {
-      AndroidWebViewController.enableDebugging(true);
-      (webViewController.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
-
-    // WebViewController를 상태에 설정
-    setState(() {
-      _webViewController = webViewController;
-    });
   }
 
   Future<void> _shareUrlWithFriends() async {
     try {
-      for (String friendUserName in widget.selectedFriendNames) {
+      for (String friendUserId in widget.selectedFriendIds) {
         final url = Uri.parse('$SERVER_IP/invite');
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
           body: json.encode({
             'sourceUserName': USER_NAME,
-            'targetUserName': friendUserName,
+            'targetUserId': friendUserId,
             'inviteUrl':
                 'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId',
           }),
@@ -103,11 +81,62 @@ class _VideoCallScreenState extends State<VideoCallScreen>
         title: Text('Video Conference'),
       ),
       body: SafeArea(
-        child: _webViewController == null
-            ? Center(
-                child:
-                    CircularProgressIndicator()) // WebViewController 초기화 전 로딩 스피너 표시
-            : WebViewWidget(controller: _webViewController!),
+        child: InAppWebView(
+          key: webViewKey,
+          initialUrlRequest: URLRequest(
+            url: WebUri(
+                'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId'),
+          ),
+          initialSettings: InAppWebViewSettings(
+            javaScriptEnabled: true,
+            mediaPlaybackRequiresUserGesture: false,
+            allowBackgroundAudioPlaying: true,
+            allowsInlineMediaPlayback: true,
+            useHybridComposition: true,
+          ),
+          // shouldOverrideUrlLoading: (controller, navigationAction) async {
+          //   var uri = navigationAction.request.url!;
+          //
+          //   if (![
+          //     "http",
+          //     "https",
+          //     "file",
+          //     "chrome",
+          //     "data",
+          //     "javascript",
+          //     "about"
+          //   ].contains(uri.scheme)) {
+          //     if (await canLaunchUrl(uri)) {
+          //       // Launch the App
+          //       await launchUrl(
+          //         uri,
+          //       );
+          //       // and cancel the request
+          //       return NavigationActionPolicy.CANCEL;
+          //     }
+          //   }
+          //
+          //   return NavigationActionPolicy.ALLOW;
+          // },
+          onWebViewCreated: (InAppWebViewController controller) {
+            setState(() {
+              _webViewController = controller;
+            });
+          },
+          onPermissionRequest:
+              (InAppWebViewController controller, request) async {
+            return PermissionResponse(
+                resources: request.resources,
+                action: PermissionResponseAction.GRANT);
+          },
+          onJsAlert: (controller, jsAlertRequest) async {
+            print(jsAlertRequest);
+            return JsAlertResponse(handledByClient: true);
+          },
+          onConsoleMessage: (controller, consoleMessage) {
+            print(consoleMessage.message);
+          },
+        ),
       ),
     );
   }
