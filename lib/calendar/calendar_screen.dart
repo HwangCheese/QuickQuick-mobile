@@ -66,51 +66,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_id');
+    final userId = prefs.getString('user_id');
+    print('Retrieved user_id: $userId'); // 디버깅
+    return userId;
   }
 
-  Future<void> addEvent(DateTime date, String description) async {
-    if (!mounted) return;
-    final userId = await getUserId();
+  Future<void> addEvent(DateTime eventDateTime, String description) async {
+    // Format the event date and time
+    String eventDateTimeString =
+        DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDateTime);
 
-    if (userId == null) {
-      print('User not logged in');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('User not logged in.')),
-      );
-      return;
-    }
+    // Prepare data for HTTP POST request
+    Map<String, String> eventData = {
+      'user_id': USER_ID,
+      'event_datetime': eventDateTimeString,
+      'description': description,
+    };
 
-    final time = TimeOfDay.now();
-    final formattedDateTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(
-        DateTime(date.year, date.month, date.day, time.hour, time.minute));
-
+    // Send HTTP POST request
     try {
-      final response = await http.post(
+      var response = await http.post(
         Uri.parse('$SERVER_IP/events'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{
-          'user_id': userId,
-          'event_datetime': formattedDateTime,
-          'description': description,
-        }),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(eventData),
       );
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
 
       if (response.statusCode == 201) {
-        print('Event added successfully');
-        await _loadEvents(); // Reload events after adding a new one
+        print('Event added successfully: ${response.body}');
+        await _loadEvents();
       } else {
-        throw Exception('Failed to add event: ${response.statusCode}');
+        print('Failed to add event: ${response.statusCode}');
+        print('Response body: ${response.body}');
       }
     } catch (e) {
-      print('Error adding event: $e');
+      print('Error occurred: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add event: $e')),
+        SnackBar(content: Text('일정 추가 중 오류 발생: $e')),
       );
     }
   }
@@ -203,6 +194,125 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isEventLine(String line) {
     RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일 (\d{1,2})시\s+(.+)');
     return pattern.hasMatch(line);
+  }
+
+  void _showAddEventDialog() {
+    final TextEditingController descriptionController = TextEditingController();
+    TimeOfDay selectedTime = TimeOfDay.now();
+    DateTime selectedDate = _focusedDay;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('새 일정 추가'),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: 400, // 대화 상자의 최대 높이를 설정합니다.
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Wrap TextField with Flexible
+                      Flexible(
+                        child: TextField(
+                          controller: descriptionController,
+                          decoration: InputDecoration(labelText: '일정 설명'),
+                          maxLines: null, // 여러 줄 입력 가능
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '날짜: ${DateFormat('yyyy-MM-dd').format(selectedDate)}',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final DateTime? pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: selectedDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2101),
+                              );
+                              if (pickedDate != null &&
+                                  pickedDate != selectedDate) {
+                                setState(() {
+                                  selectedDate = pickedDate;
+                                });
+                              }
+                            },
+                            child: Text('날짜 선택'),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '시간: ${selectedTime.format(context)}',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final TimeOfDay? pickedTime =
+                                  await showTimePicker(
+                                context: context,
+                                initialTime: selectedTime,
+                              );
+                              if (pickedTime != null &&
+                                  pickedTime != selectedTime) {
+                                setState(() {
+                                  selectedTime = pickedTime;
+                                });
+                              }
+                            },
+                            child: Text('시간 선택'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('취소'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final eventDateTime = DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedTime.hour,
+                      selectedTime.minute,
+                    );
+
+                    addEvent(eventDateTime, descriptionController.text);
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('추가'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showEventConfirmationDialog(String line) {
@@ -397,6 +507,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('캘린더'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showAddEventDialog, // "+" 버튼 클릭 시 다이얼로그 열기
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.only(
