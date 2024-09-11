@@ -898,7 +898,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       return CheckboxListTile(
                         title: Text(friends[index]['user_name']!),
                         value: selectedFriendNames
-                            .contains(friends[index]['user_name']),
+                            .contains(friends[index]['user_id']),
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
