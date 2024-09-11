@@ -376,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 leading: Icon(Icons.delete),
                 title: Text('삭제'),
                 onTap: () {
+                  Navigator.pop(context);
                   setState(() {
                     memoTexts.remove(index);
                     _deleteMemoFromServer(memoId);
@@ -383,7 +384,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     _reindexMemoTexts();
                     _fetchMemos();
                   });
-                  Navigator.pop(context);
                 },
               ),
             ],
@@ -403,7 +403,10 @@ class _HomeScreenState extends State<HomeScreen> {
       print('메모 삭제 성공');
       setState(() {
         memos.removeWhere((memo) => memo['memo_id'] == memoId);
+        memoTexts.remove(index);
+        _reindexMemoTexts();
       });
+      await _fetchMemos();
     } else {
       print('메모 삭제 실패: ${response.statusCode}');
     }
