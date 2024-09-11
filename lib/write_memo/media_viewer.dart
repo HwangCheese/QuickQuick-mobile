@@ -153,6 +153,13 @@ class _MediaViewerState extends State<MediaViewer> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  if (_isAudio)
+                    ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context, 'transcribe');
+                        },
+                        child: Text('텍스트 변환')),
+                  SizedBox(width: 10),
                   ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pop();
