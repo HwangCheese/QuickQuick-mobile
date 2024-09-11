@@ -903,10 +903,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           setState(() {
                             if (value == true) {
                               selectedFriendNames
-                                  .add(friends[index]['user_name']!);
+                                  .add(friends[index]['user_id']!);
                             } else {
                               selectedFriendNames
-                                  .remove(friends[index]['user_name']);
+                                  .remove(friends[index]['user_id']);
                             }
                           });
                         },
@@ -929,7 +929,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => VideoCallScreen(
-                              selectedFriendNames: selectedFriendNames),
+                              selectedFriendIds: selectedFriendNames),
                         ),
                       );
                     },
