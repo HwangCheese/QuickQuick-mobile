@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_sound/flutter_sound.dart';
@@ -66,6 +69,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String _transcription = ''; // 트랜스크립션 결과를 저장할 변수
   bool _shouldShowTranslationRecommendation = false;
   Timer? _debounce; // 타이머를 관리할 변수 추가
+  RichText? _richText;
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -166,14 +170,54 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         });
       }
 
-      // 이벤트 라인 확인 및 다이얼로그 표시
-      // for (String line in lines) {
-      //   if (_isEventLine(line)) {
-      //     _showEventConfirmationDialog(line);
-      //     break;
-      //   }
-      // }
+      // URL 감지 및 하이퍼링크 처리
+      _handleUrlDetection(text);
     });
+  }
+
+  void _handleUrlDetection(String text) {
+    final RegExp urlRegExp = RegExp(r'(https?://\S+)');
+    List<TextSpan> spans = [];
+    int start = 0;
+
+    for (Match match in urlRegExp.allMatches(text)) {
+      if (match.start > start) {
+        spans.add(TextSpan(
+          text: text.substring(start, match.start),
+          style: TextStyle(color: Colors.black),
+        ));
+      }
+      spans.add(TextSpan(
+        text: match.group(0),
+        style:
+            TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+        recognizer: TapGestureRecognizer()
+          ..onTap = () => _launchURL(match.group(0)!),
+      ));
+      start = match.end;
+    }
+
+    if (start < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(start),
+        style: TextStyle(color: Colors.black),
+      ));
+    }
+
+    setState(() {
+      _richText = RichText(
+        text: TextSpan(children: spans),
+      );
+    });
+  }
+
+  Future<void> _launchURL(String url) async {
+    Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      throw 'Could not launch $url';
+    }
   }
 
   Future<Set<String>> _detectLanguages(String text) async {
@@ -193,7 +237,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       );
 
       print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -1700,7 +1743,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                     maxLines: null,
                                     focusNode: _focusNode,
                                     onChanged: (text) {
-                                      _checkAndRecommendSummary(); // 텍스트가 변경될 때마다 요약 추천 체크
+                                      _handleTextChanged(); // 텍스트가 변경될 때마다 요약 추천 체크
                                     },
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
