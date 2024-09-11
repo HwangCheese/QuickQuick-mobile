@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:http/http.dart' as http;
 import 'package:sticker_memo/screens/write_memo/write_memo_screen.dart';
 import './globals.dart';
 import 'main.dart';
 
 class SocketService {
+  List<Map<String, dynamic>> memos = [];
   static final SocketService _instance = SocketService._internal();
   IO.Socket? socket;
   final FlutterLocalNotificationsPlugin _local =
@@ -36,6 +38,17 @@ class SocketService {
       priority: Priority.high,
     ),
   );
+
+  Map<String, Color> colorMap = {
+    'white': Colors.white,
+    'pink': Colors.pink[100]!,
+    'blue': Colors.blue[100]!,
+    'green': Colors.green[100]!,
+    'orange': Colors.orange[100]!,
+    'yellow': Colors.yellow[100]!,
+    'purple': Colors.purple[100]!,
+    'grey': Colors.grey[300]!,
+  };
 
   Future<void> _initializeNotification() async {
     if (await Permission.notification.isDenied &&
@@ -100,8 +113,8 @@ class SocketService {
       _sendNotification(data);
     });
 
-    // 메모 수신 알림
-    socket!.on('new-memo', (data) {
+    // 'new-memo' 이벤트에서 받은 memoId와 fetchMemos에서 불러온 memoId 비교 후 색상 찾기
+    socket!.on('new-memo', (data) async {
       print('Received message: $data');
       if (data is List && data.length >= 2) {
         String message = data[0]; // 첫 번째 인자 (메시지)
@@ -110,7 +123,28 @@ class SocketService {
         print('Received message: $message');
         print('Received memoId: $memoId');
 
+        // 알림 표시
         _sendNotification(message);
+
+        // 메모 목록 불러오기
+        await _fetchMemos();
+
+        // 불러온 메모 목록에서 memoId를 비교하여 색상 찾기
+        Color? memoColor;
+        for (var memo in memos) {
+          if (memo['memo_id'] == memoId) {
+            memoColor = memo['color']; // memoId가 일치하는 메모의 색상 저장
+            break;
+          }
+        }
+
+        // WriteMemoScreen으로 해당 메모 ID와 색상을 전달하여 화면 열기
+        MyApp.navigatorKey.currentState?.push(MaterialPageRoute(
+          builder: (context) => WriteMemoScreen(
+            initialMemoId: memoId, // 메모 ID 전달
+            initialColor: memoColor, // 메모 색상 전달
+          ),
+        ));
       } else {
         print('Unexpected data format');
       }
@@ -137,5 +171,27 @@ class SocketService {
 
     socket!.on(
         'new_client', (clientId) => {print('New client joined: $clientId')});
+  }
+
+  Future<void> _fetchMemos() async {
+    final url = Uri.parse('$SERVER_IP/memo/$USER_ID');
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> memo = json.decode(response.body);
+        memos = memo.map((item) {
+          String memoId = item['memo_id'];
+          return {
+            'color': colorMap[item['theme']] ?? Colors.white,
+            'memo_id': memoId,
+          };
+        }).toList();
+      } else {
+        print('Failed to load memos: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Failed to load memos: $e');
+    }
   }
 }
