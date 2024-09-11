@@ -64,32 +64,13 @@ class SocketService {
     );
     final InitializationSettings settings =
         InitializationSettings(android: android, iOS: ios);
-    await _local.initialize(settings,
-        onDidReceiveNotificationResponse: onDidReceiveNotificationResponse);
   }
 
-  Future<void> _sendNotification(String message) async {
-    // message는 그대로 사용
-    await _local.show(1, "알림", message, details);
-  }
+  Future<void> _sendNotification(String status, String message) async {
+    // 고유한 알림 ID를 생성 (현재 시간을 사용)
+    int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-  void onDidReceiveNotificationResponse(
-      NotificationResponse notificationResponse) async {
-    final payload = notificationResponse.payload;
-    if (payload != null) {
-      // payload는 JSON 형식의 문자열이라고 가정합니다.
-      // payload에서 memoId를 추출합니다.
-      final data = jsonDecode(payload);
-      final memoId = data['memoId'];
-
-      if (memoId != null) {
-        MyApp.navigatorKey.currentState?.push(MaterialPageRoute(
-          builder: (context) => WriteMemoScreen(
-            initialMemoId: memoId,
-          ),
-        ));
-      }
-    }
+    await _local.show(notificationId, status, message, details);
   }
 
   void _initializeSocket() {
@@ -110,7 +91,7 @@ class SocketService {
     // 친구 추가 알림
     socket!.on('add-friend', (data) {
       print('Received notification: $data');
-      _sendNotification(data);
+      _sendNotification('친구 추가', data);
     });
 
     // 'new-memo' 이벤트에서 받은 memoId와 fetchMemos에서 불러온 memoId 비교 후 색상 찾기
@@ -124,7 +105,7 @@ class SocketService {
         print('Received memoId: $memoId');
 
         // 알림 표시
-        _sendNotification(message);
+        _sendNotification('메모 수신', message);
 
         // 메모 목록 불러오기
         await _fetchMemos();
@@ -151,11 +132,11 @@ class SocketService {
     });
 
     socket!.on('kock', (message) {
-      _sendNotification(message);
+      _sendNotification('콕!', message);
     });
 
     socket!.on('invite', (message) {
-      _sendNotification(message);
+      _sendNotification('화상회의 초대', message);
     });
 
     socket!.on('connect_error', (error) {
