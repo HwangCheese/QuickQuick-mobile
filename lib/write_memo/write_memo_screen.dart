@@ -749,7 +749,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   bool _isEventLine(String line) {
-    RegExp pattern = RegExp(r'(\d{1,2})월 (\d{1,2})일\s+(.+)');
+    RegExp pattern = RegExp(r'^(1[0-2]|[1-9])[월./] ?(\d{1,2})[일]? ?(.+)$');
     return pattern.hasMatch(line);
   }
 
@@ -765,13 +765,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               child: Text('취소'),
               onPressed: () {
                 Navigator.of(context).pop();
+                Navigator.of(context)
+                    .popUntil((route) => route.isFirst); // 뒤로 가기 내비게이션
               },
             ),
             TextButton(
               child: Text('추가'),
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
-                _processEventLine(line);
+                _processEventLine(line); // 비동기 함수 호출
                 Navigator.of(context)
                     .popUntil((route) => route.isFirst); // 뒤로 가기 내비게이션
               },
