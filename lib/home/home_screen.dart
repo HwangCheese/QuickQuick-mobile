@@ -117,7 +117,6 @@ class _HomeScreenState extends State<HomeScreen> {
       print('Failed to load memos: $e');
     }
 
-    print(memoTexts);
     _filterMemos();
   }
 
@@ -162,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // originalIndex에 해당하는 데이터가 있는지 확인
           int existingIndex = datas.indexWhere(
-                (data) => data['originalIndex'] == memo['originalIndex'].toString(),
+            (data) => data['originalIndex'] == memo['originalIndex'].toString(),
           );
 
           if (existingIndex != -1) {
@@ -273,8 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
         String text = utf8.decode(response.bodyBytes);
         if (!memoTexts.containsKey(index)) {
           memoTexts[index] = text;
-        }
-        else {
+        } else {
           memoTexts.remove(index);
         }
         return text;
@@ -449,9 +447,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-        'user_name': friend['friend_name_set'],
-        'user_id': friend['friend_id'],
-      })
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
           .toList();
 
       List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
@@ -546,9 +544,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-        'user_name': friend['friend_name_set'],
-        'user_id': friend['friend_id'],
-      })
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
           .toList();
 
       List<String> selectedFriendIds = [];
@@ -781,9 +779,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       datas.sort((a, b) {
         int indexA = memos.indexWhere(
-                (memo) => memo['memo_id'] == a['data'].first['memo_id']);
+            (memo) => memo['memo_id'] == a['data'].first['memo_id']);
         int indexB = memos.indexWhere(
-                (memo) => memo['memo_id'] == b['data'].first['memo_id']);
+            (memo) => memo['memo_id'] == b['data'].first['memo_id']);
         return indexA.compareTo(indexB);
       });
 
@@ -793,7 +791,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       for (var data in datas) {
         int index = memos.indexWhere(
-                (memo) => memo['memo_id'] == data['data'].first['memo_id']);
+            (memo) => memo['memo_id'] == data['data'].first['memo_id']);
         data['originalIndex'] = index.toString();
       }
     });
@@ -862,7 +860,7 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedMemos.clear();
       } else {
         selectedMemos =
-        Set<int>.from(List<int>.generate(memos.length, (index) => index));
+            Set<int>.from(List<int>.generate(memos.length, (index) => index));
       }
     });
   }
@@ -888,9 +886,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-        'user_name': friend['friend_name_set'],
-        'user_id': friend['friend_id'],
-      })
+                'user_name': friend['friend_name_set'],
+                'user_id': friend['friend_id'],
+              })
           .toList();
 
       List<String> selectedFriendNames = []; // 선택된 친구 이름을 저장하는 리스트
@@ -986,7 +984,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 첫 번째로 텍스트 포맷을 찾음
     var firstMedia = memoDatas.firstWhere(
-          (data) => data['format'] == 'txt',
+      (data) => data['format'] == 'txt',
       orElse: () => {}, // 빈 맵 대신 null 반환
     );
 
@@ -997,8 +995,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (textData == null || textData.isEmpty) {
         // 텍스트가 비어있으면 이미지나 비디오를 다시 찾음
         firstMedia = memoDatas.firstWhere(
-              (data) =>
-          data['format'] == 'jpg' ||
+          (data) =>
+              data['format'] == 'jpg' ||
               data['format'] == 'png' ||
               data['format'] == 'jpeg' ||
               data['format'] == 'mp4' ||
@@ -1009,8 +1007,8 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       // 텍스트가 없을 경우 바로 이미지나 비디오 포맷을 찾음
       firstMedia = memoDatas.firstWhere(
-            (data) =>
-        data['format'] == 'jpg' ||
+        (data) =>
+            data['format'] == 'jpg' ||
             data['format'] == 'png' ||
             data['format'] == 'jpeg' ||
             data['format'] == 'mp4' ||
@@ -1028,7 +1026,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final List<dynamic> data = json.decode(response.body);
       // sender_user_id와 일치하는 친구의 name_set 반환
       final friend = data.firstWhere(
-            (friend) => friend['friend_id'] == senderUserId,
+        (friend) => friend['friend_id'] == senderUserId,
         orElse: () => null,
       );
       if (friend != null) {
@@ -1038,6 +1036,34 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } else {
       throw Exception('친구 목록을 불러오는 데 실패했습니다.');
+    }
+  }
+
+  Future<String> _getName(String senderUserId) async {
+    // URL에 쿼리 파라미터로 userId 추가
+    final url = Uri.parse('$SERVER_IP/get-username?userId=$senderUserId');
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        // 응답이 성공적일 때
+        final dynamic data = json.decode(response.body);
+
+        if (data != null && data is Map && data.containsKey('name')) {
+          return data['name'];
+        } else {
+          return '알 수 없음';
+        }
+      } else {
+        // 응답 코드가 200이 아닐 때
+        print('모르는 사람 이름 불러오기 실패: ${response.statusCode}');
+        return '알 수 없음';
+      }
+    } catch (e) {
+      // 예외 처리
+      print('Error fetching name: $e');
+      return '알 수 없음';
     }
   }
 
@@ -1051,13 +1077,14 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: PreferredSize(
           preferredSize: Size.fromHeight(kToolbarHeight),
           child: AppBar(
-            title: isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
+            title:
+                isSelectionMode ? Text('${selectedMemos.length}개 선택됨') : null,
             backgroundColor: Colors.transparent,
             leading: isSelectionMode
                 ? IconButton(
-              icon: Icon(Icons.close),
-              onPressed: _toggleSelectionMode,
-            )
+                    icon: Icon(Icons.close),
+                    onPressed: _toggleSelectionMode,
+                  )
                 : null,
             actions: [
               if (isSelectionMode) ...[
@@ -1131,7 +1158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                         itemBuilder: (BuildContext context) =>
-                        <PopupMenuEntry<int>>[
+                            <PopupMenuEntry<int>>[
                           const PopupMenuItem<int>(
                             value: 0,
                             child: Text('선택'),
@@ -1177,7 +1204,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 3.0, // 테두리 굵기
                       ),
                     ),
-                    suffixIcon: Icon(Icons.search, color: Colors.grey), // 검색 아이콘
+                    suffixIcon:
+                        Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                   ),
                 ),
                 SizedBox(height: 16.0),
@@ -1189,28 +1217,37 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
                     ),
-                    itemCount: filteredMemos.isEmpty && _searchController.text.isEmpty
-                        ? memos.length
-                        : filteredMemos.length,
+                    itemCount:
+                        filteredMemos.isEmpty && _searchController.text.isEmpty
+                            ? memos.length
+                            : filteredMemos.length,
                     itemBuilder: (context, index) {
-                      var currentMemos = filteredMemos.isEmpty && _searchController.text.isEmpty
+                      var currentMemos = filteredMemos.isEmpty &&
+                              _searchController.text.isEmpty
                           ? memos
                           : filteredMemos;
                       bool isSelected = selectedMemos.contains(index);
-                      int isRead = currentMemos[index]['is_read']; // Check if the memo is read
-                      Color memoColor = currentMemos[index]['color'] ?? Colors.white; // Default color
+                      int isRead = currentMemos[index]
+                          ['is_read']; // Check if the memo is read
+                      Color memoColor = currentMemos[index]['color'] ??
+                          Colors.white; // Default color
 
                       List<Map<String, dynamic>> memoDatas = datas
-                          .where((data) => data['originalIndex'] == index.toString())
+                          .where((data) =>
+                              data['originalIndex'] == index.toString())
                           .expand((data) => data['data'])
-                          .map<Map<String, dynamic>>((item) => item as Map<String, dynamic>)
+                          .map<Map<String, dynamic>>(
+                              (item) => item as Map<String, dynamic>)
                           .toList();
 
                       FutureBuilder<Map<String, dynamic>?>(
                         future: _getFirstMedia(memoDatas, index),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.done) {
-                            if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.done) {
+                            if (snapshot.hasData &&
+                                snapshot.data != null &&
+                                snapshot.data!.isNotEmpty) {
                               final firstMedia = snapshot.data!;
                               return FutureBuilder<Widget>(
                                 future: _getDataWidget(
@@ -1220,11 +1257,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                   index,
                                 ),
                                 builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.done) {
-                                    if (snapshot.hasData && currentMemos[index]['is_read'] != 1) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.done) {
+                                    if (snapshot.hasData &&
+                                        currentMemos[index]['is_read'] != 1) {
                                       return Text(
-                                          currentMemos[index]['sender_user_id'],
-                                        style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+                                        currentMemos[index]['sender_user_id'],
+                                        style: TextStyle(
+                                            fontSize: 16.0,
+                                            fontWeight: FontWeight.bold),
                                       );
                                     } else if (snapshot.hasData) {
                                       return snapshot.data!;
@@ -1237,7 +1278,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               );
                             } else {
-                              return Text('내용 없음', style: TextStyle(fontSize: 16.0));
+                              return Text('내용 없음',
+                                  style: TextStyle(fontSize: 16.0));
                             }
                           } else {
                             return Text('');
@@ -1258,17 +1300,23 @@ class _HomeScreenState extends State<HomeScreen> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8.0),
                                 border: Border.all(
-                                  color: isRead == 1 ? Colors.grey : Colors.blueAccent,
+                                  color: isRead == 1
+                                      ? Colors.grey
+                                      : Colors.blueAccent,
                                   width: isRead == 1 ? 1.0 : 2.0,
                                 ),
-                                color: currentMemos[index]['color'] ?? Colors.white,
+                                color: currentMemos[index]['color'] ??
+                                    Colors.white,
                               ),
                               child: Center(
                                 child: FutureBuilder<Map<String, dynamic>?>(
                                   future: _getFirstMedia(memoDatas, index),
                                   builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.done) {
-                                      if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.done) {
+                                      if (snapshot.hasData &&
+                                          snapshot.data != null &&
+                                          snapshot.data!.isNotEmpty) {
                                         final firstMedia = snapshot.data!;
                                         return FutureBuilder<Widget>(
                                           future: _getDataWidget(
@@ -1277,33 +1325,157 @@ class _HomeScreenState extends State<HomeScreen> {
                                             firstMedia['format'],
                                             index,
                                           ),
-                                          builder: (context, dataWidgetSnapshot) {
-                                            if (dataWidgetSnapshot.connectionState == ConnectionState.done) {
-                                              if (dataWidgetSnapshot.hasData && currentMemos[index]['is_read'] != 1) {
+                                          builder:
+                                              (context, dataWidgetSnapshot) {
+                                            if (dataWidgetSnapshot
+                                                    .connectionState ==
+                                                ConnectionState.done) {
+                                              if (dataWidgetSnapshot.hasData &&
+                                                  currentMemos[index]
+                                                          ['is_read'] !=
+                                                      1) {
                                                 return FutureBuilder<String>(
-                                                  future: _getFriendName(currentMemos[index]['sender_user_id']),
-                                                  builder: (context, friendNameSnapshot) {
-                                                    if (friendNameSnapshot.connectionState == ConnectionState.done) {
-                                                      if (friendNameSnapshot.hasData) {
-                                                        return AnimatedSwitcher(
-                                                          duration: Duration(milliseconds: 500),
-                                                          child: Text(
-                                                            _showSender
-                                                                ? currentMemos[index]['title']
-                                                                : friendNameSnapshot.data!,
-                                                            key: ValueKey<String>(_showSender ? 'sender' : 'receiver'),
-                                                            style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-                                                          ),
-                                                        );
+                                                  future: _getFriendName(
+                                                      currentMemos[index]
+                                                          ['sender_user_id']),
+                                                  builder: (context,
+                                                      friendNameSnapshot) {
+                                                    if (friendNameSnapshot
+                                                            .connectionState ==
+                                                        ConnectionState.done) {
+                                                      if (friendNameSnapshot
+                                                          .hasData) {
+                                                        // 친구 이름이 "알 수 없음"이면 추가로 _getName 함수 호출
+                                                        if (friendNameSnapshot
+                                                                .data ==
+                                                            "알 수 없음") {
+                                                          return FutureBuilder<
+                                                              String>(
+                                                            future: _getName(
+                                                                currentMemos[
+                                                                        index][
+                                                                    'sender_user_id']),
+                                                            builder: (context,
+                                                                nameSnapshot) {
+                                                              if (nameSnapshot
+                                                                      .connectionState ==
+                                                                  ConnectionState
+                                                                      .done) {
+                                                                if (nameSnapshot
+                                                                    .hasData) {
+                                                                  return AnimatedSwitcher(
+                                                                    duration: Duration(
+                                                                        seconds:
+                                                                            1), // 애니메이션 지속 시간
+                                                                    transitionBuilder: (Widget
+                                                                            child,
+                                                                        Animation<double>
+                                                                            animation) {
+                                                                      return SlideTransition(
+                                                                        position: Tween<
+                                                                            Offset>(
+                                                                          begin: const Offset(
+                                                                              0.0,
+                                                                              1.0), // 아래에서 위로 슬라이드
+                                                                          end: Offset
+                                                                              .zero,
+                                                                        ).animate(
+                                                                            animation),
+                                                                        child:
+                                                                            FadeTransition(
+                                                                          opacity:
+                                                                              animation, // 페이드 애니메이션 추가
+                                                                          child:
+                                                                              child,
+                                                                        ),
+                                                                      );
+                                                                    },
+                                                                    child: Text(
+                                                                      _showSender
+                                                                          ? currentMemos[index]
+                                                                              [
+                                                                              'title']
+                                                                          : nameSnapshot
+                                                                              .data!,
+                                                                      key: ValueKey<String>(_showSender
+                                                                          ? 'sender'
+                                                                          : 'receiver'),
+                                                                      style: TextStyle(
+                                                                          fontSize:
+                                                                              16.0,
+                                                                          fontWeight:
+                                                                              FontWeight.bold),
+                                                                    ),
+                                                                  );
+                                                                } else {
+                                                                  return Text(
+                                                                      '사용자 이름을 불러올 수 없습니다.');
+                                                                }
+                                                              } else {
+                                                                return CircularProgressIndicator();
+                                                              }
+                                                            },
+                                                          );
+                                                        } else {
+                                                          // friendNameSnapshot이 "알 수 없음"이 아닌 경우 기존 이름을 출력
+                                                          return AnimatedSwitcher(
+                                                            duration: Duration(
+                                                                seconds: 1),
+                                                            transitionBuilder: (Widget
+                                                                    child,
+                                                                Animation<
+                                                                        double>
+                                                                    animation) {
+                                                              return SlideTransition(
+                                                                position: Tween<
+                                                                    Offset>(
+                                                                  begin: const Offset(
+                                                                      0.0,
+                                                                      1.0), // 아래에서 위로 슬라이드
+                                                                  end: Offset
+                                                                      .zero,
+                                                                ).animate(
+                                                                    animation),
+                                                                child:
+                                                                    FadeTransition(
+                                                                  opacity:
+                                                                      animation,
+                                                                  child: child,
+                                                                ),
+                                                              );
+                                                            },
+                                                            child: Text(
+                                                              _showSender
+                                                                  ? currentMemos[
+                                                                          index]
+                                                                      ['title']
+                                                                  : friendNameSnapshot
+                                                                      .data!,
+                                                              key: ValueKey<
+                                                                      String>(
+                                                                  _showSender
+                                                                      ? 'sender'
+                                                                      : 'receiver'),
+                                                              style: TextStyle(
+                                                                  fontSize:
+                                                                      16.0,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold),
+                                                            ),
+                                                          );
+                                                        }
                                                       } else {
-                                                        return Text('친구 이름을 불러올 수 없습니다.');
+                                                        return Text(
+                                                            '친구 이름을 불러올 수 없습니다.');
                                                       }
                                                     } else {
-                                                      return Text('');
+                                                      return CircularProgressIndicator(); // 데이터 로딩 중
                                                     }
                                                   },
                                                 );
-                                              } else if (dataWidgetSnapshot.hasData) {
+                                              } else if (dataWidgetSnapshot
+                                                  .hasData) {
                                                 return dataWidgetSnapshot.data!;
                                               } else {
                                                 return Text('데이터를 불러올 수 없습니다.');
@@ -1314,7 +1486,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           },
                                         );
                                       } else {
-                                        return const Text('내용 없음', style: TextStyle(fontSize: 16.0));
+                                        return const Text('내용 없음',
+                                            style: TextStyle(fontSize: 16.0));
                                       }
                                     } else {
                                       return Text("");
@@ -1340,17 +1513,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: isSelected ? Colors.blue[400] : Colors.white,
+                                    color: isSelected
+                                        ? Colors.blue[400]
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: isSelected ? Colors.transparent : Colors.grey,
+                                      color: isSelected
+                                          ? Colors.transparent
+                                          : Colors.grey,
                                       width: 2,
                                     ),
                                   ),
                                   child: Icon(
                                     Icons.check,
                                     size: 16,
-                                    color: isSelected ? Colors.white : Colors.transparent,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.transparent,
                                   ),
                                 ),
                               ),
@@ -1383,7 +1562,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 memoTexts[0] = result['text'];
 
-                memos.insert(0, result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
+                memos.insert(
+                    0, result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
               });
               _sortMemos();
             }
