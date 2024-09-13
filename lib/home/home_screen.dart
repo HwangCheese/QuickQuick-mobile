@@ -1035,6 +1035,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<String> _getName(String senderUserId) async {
+    if (senderUserId == USER_ID) return '';
+
     // URL에 쿼리 파라미터로 userId 추가
     final url = Uri.parse('$SERVER_IP/get-username?userId=$senderUserId');
 
@@ -1045,13 +1047,8 @@ class _HomeScreenState extends State<HomeScreen> {
         // 응답이 성공적일 때
         final dynamic data = json.decode(response.body);
 
-        if (data != null &&
-            data is Map &&
-            data.containsKey('name') &&
-            USER_NAME != data['name']) {
+        if (data != null && data is Map && data.containsKey('name')) {
           return data['name'];
-        } else if (USER_NAME == data['name']) {
-          return '';
         } else {
           return '알 수 없음';
         }
@@ -1278,8 +1275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               );
                             } else {
-                              return Text('내용 없음',
-                                  style: TextStyle(fontSize: 16.0));
+                              return Text('', style: TextStyle(fontSize: 16.0));
                             }
                           } else {
                             return Text('');
@@ -1341,7 +1337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           },
                                         );
                                       } else {
-                                        return Text('내용 없음',
+                                        return Text('',
                                             style: TextStyle(fontSize: 16.0));
                                       }
                                     } else {
