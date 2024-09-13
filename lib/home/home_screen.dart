@@ -54,11 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchMemos();
     _searchController.addListener(_filterMemos);
-    _timer = Timer.periodic(Duration(seconds: 5), (Timer timer) {
-      setState(() {
-        _showSender = !_showSender;
-      });
-    });
   }
 
   @override
@@ -1050,8 +1045,13 @@ class _HomeScreenState extends State<HomeScreen> {
         // 응답이 성공적일 때
         final dynamic data = json.decode(response.body);
 
-        if (data != null && data is Map && data.containsKey('name')) {
+        if (data != null &&
+            data is Map &&
+            data.containsKey('name') &&
+            USER_NAME != data['name']) {
           return data['name'];
+        } else if (USER_NAME == data['name']) {
+          return '';
         } else {
           return '알 수 없음';
         }
@@ -1330,152 +1330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                             if (dataWidgetSnapshot
                                                     .connectionState ==
                                                 ConnectionState.done) {
-                                              if (dataWidgetSnapshot.hasData &&
-                                                  currentMemos[index]
-                                                          ['is_read'] !=
-                                                      1) {
-                                                return FutureBuilder<String>(
-                                                  future: _getFriendName(
-                                                      currentMemos[index]
-                                                          ['sender_user_id']),
-                                                  builder: (context,
-                                                      friendNameSnapshot) {
-                                                    if (friendNameSnapshot
-                                                            .connectionState ==
-                                                        ConnectionState.done) {
-                                                      if (friendNameSnapshot
-                                                          .hasData) {
-                                                        // 친구 이름이 "알 수 없음"이면 추가로 _getName 함수 호출
-                                                        if (friendNameSnapshot
-                                                                .data ==
-                                                            "알 수 없음") {
-                                                          return FutureBuilder<
-                                                              String>(
-                                                            future: _getName(
-                                                                currentMemos[
-                                                                        index][
-                                                                    'sender_user_id']),
-                                                            builder: (context,
-                                                                nameSnapshot) {
-                                                              if (nameSnapshot
-                                                                      .connectionState ==
-                                                                  ConnectionState
-                                                                      .done) {
-                                                                if (nameSnapshot
-                                                                    .hasData) {
-                                                                  return AnimatedSwitcher(
-                                                                    duration: Duration(
-                                                                        seconds:
-                                                                            1), // 애니메이션 지속 시간
-                                                                    transitionBuilder: (Widget
-                                                                            child,
-                                                                        Animation<double>
-                                                                            animation) {
-                                                                      return SlideTransition(
-                                                                        position: Tween<
-                                                                            Offset>(
-                                                                          begin: const Offset(
-                                                                              0.0,
-                                                                              1.0), // 아래에서 위로 슬라이드
-                                                                          end: Offset
-                                                                              .zero,
-                                                                        ).animate(
-                                                                            animation),
-                                                                        child:
-                                                                            FadeTransition(
-                                                                          opacity:
-                                                                              animation, // 페이드 애니메이션 추가
-                                                                          child:
-                                                                              child,
-                                                                        ),
-                                                                      );
-                                                                    },
-                                                                    child: Text(
-                                                                      _showSender
-                                                                          ? currentMemos[index]
-                                                                              [
-                                                                              'title']
-                                                                          : nameSnapshot
-                                                                              .data!,
-                                                                      key: ValueKey<String>(_showSender
-                                                                          ? 'sender'
-                                                                          : 'receiver'),
-                                                                      style: TextStyle(
-                                                                          fontSize:
-                                                                              16.0,
-                                                                          fontWeight:
-                                                                              FontWeight.bold),
-                                                                    ),
-                                                                  );
-                                                                } else {
-                                                                  return Text(
-                                                                      '사용자 이름을 불러올 수 없습니다.');
-                                                                }
-                                                              } else {
-                                                                return CircularProgressIndicator();
-                                                              }
-                                                            },
-                                                          );
-                                                        } else {
-                                                          // friendNameSnapshot이 "알 수 없음"이 아닌 경우 기존 이름을 출력
-                                                          return AnimatedSwitcher(
-                                                            duration: Duration(
-                                                                seconds: 1),
-                                                            transitionBuilder: (Widget
-                                                                    child,
-                                                                Animation<
-                                                                        double>
-                                                                    animation) {
-                                                              return SlideTransition(
-                                                                position: Tween<
-                                                                    Offset>(
-                                                                  begin: const Offset(
-                                                                      0.0,
-                                                                      1.0), // 아래에서 위로 슬라이드
-                                                                  end: Offset
-                                                                      .zero,
-                                                                ).animate(
-                                                                    animation),
-                                                                child:
-                                                                    FadeTransition(
-                                                                  opacity:
-                                                                      animation,
-                                                                  child: child,
-                                                                ),
-                                                              );
-                                                            },
-                                                            child: Text(
-                                                              _showSender
-                                                                  ? currentMemos[
-                                                                          index]
-                                                                      ['title']
-                                                                  : friendNameSnapshot
-                                                                      .data!,
-                                                              key: ValueKey<
-                                                                      String>(
-                                                                  _showSender
-                                                                      ? 'sender'
-                                                                      : 'receiver'),
-                                                              style: TextStyle(
-                                                                  fontSize:
-                                                                      16.0,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold),
-                                                            ),
-                                                          );
-                                                        }
-                                                      } else {
-                                                        return Text(
-                                                            '친구 이름을 불러올 수 없습니다.');
-                                                      }
-                                                    } else {
-                                                      return CircularProgressIndicator(); // 데이터 로딩 중
-                                                    }
-                                                  },
-                                                );
-                                              } else if (dataWidgetSnapshot
-                                                  .hasData) {
+                                              if (dataWidgetSnapshot.hasData) {
                                                 return dataWidgetSnapshot.data!;
                                               } else {
                                                 return Text('데이터를 불러올 수 없습니다.');
@@ -1486,7 +1341,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           },
                                         );
                                       } else {
-                                        return const Text('내용 없음',
+                                        return Text('내용 없음',
                                             style: TextStyle(fontSize: 16.0));
                                       }
                                     } else {
@@ -1496,14 +1351,63 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             ),
+                            // Always show sender's name in the top-left corner
+                            Positioned(
+                              top: 8.0,
+                              left: 8.0,
+                              child: FutureBuilder<String>(
+                                future: _getFriendName(
+                                    currentMemos[index]['sender_user_id']),
+                                builder: (context, friendNameSnapshot) {
+                                  if (friendNameSnapshot.connectionState ==
+                                      ConnectionState.done) {
+                                    if (friendNameSnapshot.hasData) {
+                                      if (friendNameSnapshot.data == "알 수 없음") {
+                                        return FutureBuilder<String>(
+                                          future: _getName(currentMemos[index]
+                                              ['sender_user_id']),
+                                          builder: (context, nameSnapshot) {
+                                            if (nameSnapshot.connectionState ==
+                                                ConnectionState.done) {
+                                              if (nameSnapshot.hasData &&
+                                                  nameSnapshot.data! != '') {
+                                                return Text(
+                                                    'From. ${nameSnapshot.data!}',
+                                                    style: TextStyle(
+                                                        color: Colors.grey,
+                                                        fontSize: 12.0,
+                                                        fontWeight:
+                                                            FontWeight.bold));
+                                              } else {
+                                                return Text('');
+                                              }
+                                            } else {
+                                              return Text('');
+                                            }
+                                          },
+                                        );
+                                      } else {
+                                        return Text(
+                                            'From. ${friendNameSnapshot.data!}',
+                                            style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 12.0,
+                                                fontWeight: FontWeight.bold));
+                                      }
+                                    } else {
+                                      return Text('');
+                                    }
+                                  } else {
+                                    return Text('');
+                                  }
+                                },
+                              ),
+                            ),
                             if (currentMemos[index]['isPinned'])
                               Positioned(
                                 top: 8.0,
                                 right: 8.0,
-                                child: Icon(
-                                  Icons.push_pin,
-                                  color: Colors.grey,
-                                ),
+                                child: Icon(Icons.push_pin, color: Colors.grey),
                               ),
                             if (isSelectionMode)
                               Positioned(
