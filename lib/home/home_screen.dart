@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   int isRead = 0;
   bool _showSender = true;
-  Timer? _timer;
+  Set<String> pinnedMemoIds = Set<String>();
 
   Map<String, Color> colorMap = {
     'white': Colors.white,
@@ -56,12 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.addListener(_filterMemos);
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
   Future<void> _fetchMemos() async {
     index = 0;
     setState(() {
@@ -78,9 +72,11 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           memos = memo.map((item) {
             String memoId = item['memo_id'];
+            // 고정 상태를 기존에 저장된 pinnedMemoIds와 비교하여 설정
+            bool isPinned = pinnedMemoIds.contains(memoId);
             return {
               'color': colorMap[item['theme']] ?? Colors.white,
-              'isPinned': false,
+              'isPinned': isPinned, // 고정 상태 설정
               'memo_id': memoId,
               'timestamp': DateTime.parse(item['date']),
               'title': item['title'],
@@ -91,11 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
           }).toList();
         });
 
-        // Fetch details
         List<Future<void>> fetchDetailFutures = [];
-        for (var item in memos) {
-          String memoId = item['memo_id'];
-          fetchDetailFutures.add(_fetchMemoDetails(memoId));
+        for (int i = 0; i < memos.length; i++) {
+          String memoId = memos[i]['memo_id'];
+          fetchDetailFutures.add(_fetchMemoDetails(memoId, i));
         }
 
         await Future.wait(fetchDetailFutures);
@@ -113,9 +108,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     _filterMemos();
+    print(memoTexts);
   }
 
-  Future<void> _fetchMemoDetails(String memoId) async {
+  Future<void> _fetchMemoDetails(String memoId, int memoIndex) async {
     final url = Uri.parse('$SERVER_IP/memo/$memoId/data');
     try {
       final response = await http.get(url);
@@ -131,13 +127,20 @@ class _HomeScreenState extends State<HomeScreen> {
             'format': item['format'],
             'content_type': item['content_type'],
           });
+
+          // 텍스트 데이터를 찾으면 가져와서 memoTexts에 저장
+          if (item['format'] == 'txt') {
+            String dataId = item['data_id'];
+            String? textContent = await _getData(dataId);
+            memoTexts[memoIndex] = textContent!;
+          }
         }
 
         memoDetailsMap[memoId] = {
           'data': memoItems,
         };
 
-        // Trigger UI update
+        // UI 업데이트
         _updateMemos();
       } else {
         print('Failed to load memo datas: ${response.statusCode}');
@@ -179,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (format == 'txt' && title != "미디어 메모") {
       // 메모에 텍스트가 있을 경우
       return FutureBuilder<String?>(
-        future: _getData(dataId, index),
+        future: _getData(dataId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             if (snapshot.hasData) {
@@ -259,17 +262,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<String?> _getData(String dataId, int index) async {
+  Future<String?> _getData(String dataId) async {
     final url = Uri.parse("$SERVER_IP/data/$dataId/file");
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
         String text = utf8.decode(response.bodyBytes);
-        if (!memoTexts.containsKey(index)) {
-          memoTexts[index] = text;
-        } else {
-          memoTexts.remove(index);
-        }
         return text;
       } else {
         print('파일 불러오기 실패: ${response.statusCode}');
@@ -739,16 +737,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _togglePin(int index) {
     setState(() {
+      String memoId = memos[index]['memo_id'];
       bool isPinned = memos[index]['isPinned'];
       memos[index]['isPinned'] = !isPinned;
 
-      if (!isPinned) {
+      if (memos[index]['isPinned']) {
+        // 고정된 메모 목록에 추가
+        pinnedMemoIds.add(memoId);
+
         // 고정된 메모를 맨 위로 이동
         var memo = memos.removeAt(index);
         var data = datas.removeAt(index); // 데이터도 함께 이동
         memos.insert(0, memo);
-        datas.insert(0, data); // 데이터도 함께 상단으로 이동
+        datas.insert(0, data); // 데이터도 상단으로 이동
       } else {
+        // 고정 해제 시 목록에서 제거
+        pinnedMemoIds.remove(memoId);
+
         // 고정 해제 시 원래 위치로 되돌림
         var memo = memos.removeAt(index);
         var data = datas.removeAt(index); // 데이터도 함께 이동
@@ -985,7 +990,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 텍스트 포맷이 있으면 내용을 비동기적으로 가져와서 확인
     if (firstMedia != null) {
-      final textData = await _getData(firstMedia['data_id'], index);
+      final textData = await _getData(firstMedia['data_id']);
 
       if (textData == null || textData.isEmpty) {
         // 텍스트가 비어있으면 이미지나 비디오를 다시 찾음
@@ -1454,6 +1459,7 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               MaterialPageRoute(builder: (context) => WriteMemoScreen()),
             );
+            print(result);
             if (result != null &&
                 result['text'] != null &&
                 result['text'].isNotEmpty) {
@@ -1461,12 +1467,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
 
                 memoTexts[0] = result['text'];
-
-                memos.insert(
-                    0, result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
               });
               _sortMemos();
+            } else if (result == null) {
+              memoTexts[0] = '';
             }
+            memos.insert(0, result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
 
             _fetchMemos(); // 서버에서 최신 데이터 불러오기
             _sortMemos();
