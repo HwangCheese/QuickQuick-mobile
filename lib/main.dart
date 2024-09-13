@@ -4,6 +4,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sticker_memo/screens/login/login_screen.dart';
 import 'package:sticker_memo/screens/home/home_screen.dart';
+import 'package:sticker_memo/socket_service.dart';
 import 'globals.dart';
 
 void main() async {
@@ -19,6 +20,8 @@ void main() async {
   if (token != null && userId != null && userName != null) {
     USER_ID = userId;
     USER_NAME = userName;
+
+    SocketService();
 
     initialScreen = HomeScreen();
   } else {
