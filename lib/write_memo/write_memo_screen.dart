@@ -29,11 +29,13 @@ class WriteMemoScreen extends StatefulWidget {
   final Color? initialColor;
   String? initialMemoId;
   final Uint8List? initialImageData;
+  int? isRead;
 
   WriteMemoScreen({
     this.initialColor,
     this.initialMemoId,
     this.initialImageData,
+    this.isRead,
   });
 
   @override
@@ -120,15 +122,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _initRecorder();
     _videoControllers = [];
     _controller.addListener(_handleTextChanged);
+
+    print(widget.isRead);
   }
 
-  void _handleTextChanged() {
+  Set<String> _currentDetectedLanguages = {}; // 감지된 언어를 저장하는 Set
+
+  Future<void> _handleTextChanged() async {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
     _debounce = Timer(const Duration(milliseconds: 300), () async {
-      // 0.5초 동안 입력이 없으면 실행
       String text = _controller.text;
-      List<String> lines = text.split('\n');
+
+      Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
 
       // 요약 추천 로직 (100자 이상 입력 시)
       if (text.length >= 100 && !_shouldShowSummaryRecommendation) {
@@ -141,20 +147,24 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         });
       }
 
-      // 언어 감지 및 번역 추천 로직
       if (text.isNotEmpty) {
+        // 새로 입력된 텍스트에 대한 언어 감지
         final detectedLanguages = await _detectLanguages(text);
-        if (detectedLanguages.contains('ko') && detectedLanguages.length > 1) {
+
+        // 감지된 언어를 기존에 감지된 언어와 합치기
+        _currentDetectedLanguages.addAll(detectedLanguages);
+
+        print(
+            'Current detected languages: $_currentDetectedLanguages'); // 감지된 전체 언어 확인
+
+        // 여러 언어가 섞여 있으면 번역 버튼 표시
+        if (_currentDetectedLanguages.contains('ko') &&
+            _currentDetectedLanguages.length > 1) {
           setState(() {
             _shouldShowTranslationRecommendation = true;
           });
-        } else if (detectedLanguages.contains('ko') &&
-            detectedLanguages.length == 1) {
-          setState(() {
-            _shouldShowTranslationRecommendation = false;
-          });
-        } else if (!detectedLanguages.contains('ko') &&
-            detectedLanguages.isNotEmpty) {
+        } else if (!_currentDetectedLanguages.contains('ko') &&
+            _currentDetectedLanguages.isNotEmpty) {
           setState(() {
             _shouldShowTranslationRecommendation = true;
           });
@@ -164,10 +174,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           });
         }
       } else {
-        // 입력이 비어있는 경우, 번역 추천 버튼 숨기기
+        // 텍스트가 비었을 때 번역 버튼 숨기기
         setState(() {
           _shouldShowTranslationRecommendation = false;
         });
+
+        // 텍스트가 비면 감지된 언어 초기화
+        _currentDetectedLanguages.clear();
       }
 
       // URL 감지 및 하이퍼링크 처리
@@ -221,11 +234,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<Set<String>> _detectLanguages(String text) async {
-    // 숫자만 있거나 특수문자만 있으면 감지하지 않도록 처리
-    // if (RegExp(r'^\d+$').hasMatch(text) || RegExp(r'^[^\p{L}\d]+$').hasMatch(text)) {
-    //   return {'ko'}; // 감지되지 않음으로 처리
-    // }
-
     final url =
         'https://translation.googleapis.com/language/translate/v2/detect?key=$apiKey';
 
@@ -258,20 +266,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     } catch (e) {
       print('Error occurred: $e');
       return {'und'}; // 감지되지 않음
-    }
-  }
-
-  void _checkAndRecommendSummary() {
-    int characterCount = _controller.text.length;
-
-    if (characterCount >= 300 && !_shouldShowSummaryRecommendation) {
-      setState(() {
-        _shouldShowSummaryRecommendation = true;
-      });
-    } else if (characterCount < 300 && _shouldShowSummaryRecommendation) {
-      setState(() {
-        _shouldShowSummaryRecommendation = false;
-      });
     }
   }
 
@@ -466,18 +460,49 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _getSummary() async {
-    final response = await http.post(
-      Uri.parse('$SERVER_IP/summarize'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'text': _controller.text}),
-    );
+    final url = 'https://api.openai.com/v1/chat/completions';
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      setState(() {
-        _summary = data['summary'];
-      });
-    } else {
+    // 메시지 배열을 설정하여 요약 요청
+    final messages = [
+      {
+        'role': 'system',
+        'content': 'You are a helpful assistant who summarizes text.'
+      },
+      {'role': 'user', 'content': _controller.text}
+    ];
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $openapiKey',
+          'Accept-Charset': 'UTF-8', // UTF-8 인코딩 요청
+        },
+        body: jsonEncode({
+          'model': 'gpt-3.5-turbo',
+          'messages': messages,
+          'max_tokens': 100, // 요약 길이 조정
+          'temperature': 0.7, // 생성 다양성 조정
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseBody = response.body;
+        print('Raw response body: $responseBody'); // 응답 본문 출력
+
+        final data = jsonDecode(response.body);
+        final summary = data['choices'][0]['message']['content'].trim();
+        setState(() {
+          _summary = summary;
+        });
+      } else {
+        setState(() {
+          _summary = '요약을 가져오는 중 오류 발생.';
+        });
+      }
+    } catch (e) {
+      print('Error occurred: $e');
       setState(() {
         _summary = '요약을 가져오는 중 오류 발생.';
       });
@@ -493,8 +518,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'q': text,
-          'target': targetLanguage,
+          'q': text, // 번역할 텍스트
+          'target': targetLanguage, // 타겟 언어 (예: 'ko')
+          'source': 'en', // 소스 언어 (예: 'en'으로 설정)
         }),
       );
 
@@ -529,8 +555,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
 
     try {
-      final translatedText =
-          await translateText(textToTranslate, _selectedLanguage);
+      // 번역할 언어를 한국어로 설정 (고정값으로 설정)
+      final translatedText = await translateText(textToTranslate, 'ko');
       setState(() {
         _translatedText = translatedText;
       });
@@ -683,7 +709,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
 
     // 메모 변경 확인
-    if (!_hasMemoChanged()) {
+    if (widget.isRead == 1 && !_hasMemoChanged()) {
       print('메모가 변경되지 않았습니다. 저장을 건너뜁니다.');
       return;
     }
@@ -708,6 +734,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     request.fields['height'] = '300';
     request.fields['memo_id'] = widget.initialMemoId!;
     request.fields['title'] = generatedTitle;
+    request.fields['is_read'] = 1.toString(); // 읽음 안읽음 여부 판단
+    request.fields['sender_user_id'] = USER_ID;
 
     // 텍스트가 있는 경우 추가, 없으면 빈 텍스트로 추가
     request.fields['data_txt'] =
@@ -731,7 +759,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
 
     // 기존 메모가 있으면 삭제
-    if (widget.initialMemoId != null && _hasMemoChanged()) {
+    if (widget.initialMemoId != null) {
       await _deleteMemoFromServer(widget.initialMemoId!);
     }
 
@@ -749,7 +777,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   bool _isEventLine(String line) {
-    RegExp pattern = RegExp(r'^(1[0-2]|[1-9])[월./] ?(\d{1,2})[일]? ?(.+)$');
+    // 여러 이벤트를 처리할 수 있도록 정규식 수정
+    RegExp pattern =
+        RegExp(r'^(1[0-2]|[1-9])[월./] ?(\d{1,2})[일]? ?(.+)$', multiLine: true);
     return pattern.hasMatch(line);
   }
 
@@ -765,8 +795,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               child: Text('취소'),
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context)
-                    .popUntil((route) => route.isFirst); // 뒤로 가기 내비게이션
+                Navigator.of(context).popUntil((route) => route.isFirst);
               },
             ),
             TextButton(
@@ -774,8 +803,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               onPressed: () async {
                 Navigator.of(context).pop();
                 _processEventLine(line); // 비동기 함수 호출
-                Navigator.of(context)
-                    .popUntil((route) => route.isFirst); // 뒤로 가기 내비게이션
+                Navigator.of(context).popUntil((route) => route.isFirst);
               },
             ),
           ],
@@ -785,47 +813,49 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   void _processEventLine(String line) async {
-    // 시간 정보를 포함할 수 있는 정규식 (ex. 9월 4일 15:30 아륀이랑 놀기)
-    RegExp pattern =
-        RegExp(r'(\d{1,2})월 (\d{1,2})일(?:\s+(\d{1,2}):(\d{1,2}))?\s+(.+)');
-    Match? match = pattern.firstMatch(line);
+    // 여러 이벤트를 인식하도록 정규식을 사용하여 모든 매치 찾기
+    RegExp pattern = RegExp(
+        r'(\d{1,2})월 (\d{1,2})일(?:\s+(\d{1,2}):(\d{1,2}))?\s+(.+?)(?=\s+\d{1,2}월|\Z)');
+    Iterable<Match> matches = pattern.allMatches(line);
 
-    if (match != null) {
-      int month = int.parse(match.group(1)!);
-      int day = int.parse(match.group(2)!);
-      int hour = match.group(3) != null ? int.parse(match.group(3)!) : 0;
-      int minute = match.group(4) != null ? int.parse(match.group(4)!) : 0;
-      String eventDescription = match.group(5)!;
+    if (matches.isNotEmpty) {
+      for (Match match in matches) {
+        int month = int.parse(match.group(1)!);
+        int day = int.parse(match.group(2)!);
+        int hour = match.group(3) != null ? int.parse(match.group(3)!) : 0;
+        int minute = match.group(4) != null ? int.parse(match.group(4)!) : 0;
+        String eventDescription = match.group(5)!;
 
-      // 연도를 2024로 고정
-      DateTime eventDate = DateTime(2024, month, day, hour, minute);
+        // 연도를 2024로 고정
+        DateTime eventDate = DateTime(2024, month, day, hour, minute);
 
-      // 이벤트 날짜와 시간을 적절한 형식으로 변환 (입력된 시간이 없는 경우 00:00:00)
-      String eventDateTimeString =
-          DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate);
+        // 이벤트 날짜와 시간을 적절한 형식으로 변환 (입력된 시간이 없는 경우 00:00:00)
+        String eventDateTimeString =
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate);
 
-      // 서버로 보낼 데이터를 JSON으로 변환
-      Map<String, String> eventData = {
-        'user_id': USER_ID,
-        'event_datetime': eventDateTimeString,
-        'description': eventDescription,
-      };
+        // 서버로 보낼 데이터를 JSON으로 변환
+        Map<String, String> eventData = {
+          'user_id': USER_ID,
+          'event_datetime': eventDateTimeString,
+          'description': eventDescription,
+        };
 
-      // HTTP POST 요청
-      try {
-        var response = await http.post(
-          Uri.parse('$SERVER_IP/events'),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode(eventData),
-        );
+        // HTTP POST 요청
+        try {
+          var response = await http.post(
+            Uri.parse('$SERVER_IP/events'),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode(eventData),
+          );
 
-        if (response.statusCode == 200) {
-          print('Event added successfully: ${response.body}');
-        } else {
-          print('Failed to add event: ${response.statusCode}');
+          if (response.statusCode == 200) {
+            print('Event added successfully: ${response.body}');
+          } else {
+            print('Failed to add event: ${response.statusCode}');
+          }
+        } catch (e) {
+          print('Error occurred: $e');
         }
-      } catch (e) {
-        print('Error occurred: $e');
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1000,36 +1030,64 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   void _extractAndLinkifyText(BuildContext context) {
     final text = _controller.text;
     final datePattern = RegExp(
-        r'\b(?:(\d{1,4})[.-](\d{1,2})[.-](\d{1,2})|(\d{1,2})[월.]?\s*(\d{1,2})[일]?)\b');
+        r'(\d{1,4})[.-](\d{1,2})[.-](\d{1,2})|(\d{1,2})[월.]?\s*(\d{1,2})[일]?');
     final matches = datePattern.allMatches(text);
 
-    if (matches.isNotEmpty) {
-      for (final match in matches) {
-        DateTime? date;
+    final events = <DateTime, String>{};
+    int lastIndex = 0;
+    DateTime? lastDate;
 
-        if (match.group(1) != null) {
-          // yyyy-mm-dd, yy-m-d, etc. 형식
-          final year = int.parse(match.group(1)!);
-          final month = int.parse(match.group(2)!);
-          final day = int.parse(match.group(3)!);
+    for (final match in matches) {
+      DateTime? date;
 
-          date = DateTime(
-            year < 100 ? (year + 2000) : year, // 2자리 연도 처리
-            month,
-            day,
-          );
-        } else if (match.group(4) != null) {
-          // "7월 14일" 또는 "7.14" 형식
-          final month = int.parse(match.group(4)!);
-          final day = int.parse(match.group(5)!);
+      if (match.group(1) != null) {
+        // yyyy-mm-dd, yy-m-d 형식
+        final year = int.parse(match.group(1)!);
+        final month = int.parse(match.group(2)!);
+        final day = int.parse(match.group(3)!);
 
-          final currentYear = DateTime.now().year;
-          date = DateTime(currentYear, month, day);
+        date = DateTime(
+          year < 100 ? (year + 2000) : year, // 2자리 연도 처리
+          month,
+          day,
+        );
+      } else if (match.group(4) != null) {
+        // "7월 14일" 형식
+        final month = int.parse(match.group(4)!);
+        final day = int.parse(match.group(5)!);
+
+        final currentYear = DateTime.now().year;
+        date = DateTime(currentYear, month, day);
+      }
+
+      if (date != null) {
+        final content = text.substring(lastIndex, match.start).trim();
+        lastIndex = match.end;
+
+        if (content.isNotEmpty) {
+          events[date] = content;
         }
 
-        if (date != null) {
-          _showAddEventDialog(context, date, text);
-        }
+        lastDate = date; // 마지막 날짜 업데이트
+      }
+    }
+
+    // 마지막 날짜 이후의 내용 추가
+    if (lastIndex < text.length) {
+      final content = text.substring(lastIndex).trim();
+      if (content.isNotEmpty) {
+        final eventDate = lastDate ?? DateTime.now(); // 마지막 날짜가 없으면 오늘 날짜로 설정
+        events[eventDate] = content;
+      }
+    }
+
+    // 날짜가 추가된 순서대로 정렬 후 다이얼로그 표시
+    final sortedEvents = events.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    if (sortedEvents.isNotEmpty) {
+      for (var entry in sortedEvents) {
+        _showAddEventDialog(context, entry.key, entry.value);
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1055,7 +1113,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             ),
             TextButton(
               onPressed: () {
-                //CalendarScreen.addEvent(context, date, text);
+                // CalendarScreen.addEvent(context, date, text);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('일정이 추가되었습니다.')),
