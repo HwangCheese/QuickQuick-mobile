@@ -5,7 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
-import 'package:sticker_memo/screens/write_memo/write_memo_screen.dart';
+import '/write_memo/write_memo_screen.dart';
 import './globals.dart';
 import 'main.dart';
 
@@ -15,6 +15,7 @@ class SocketService {
   IO.Socket? socket;
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
+  String? notificationMemoId;
 
   factory SocketService() {
     return _instance;
@@ -55,6 +56,7 @@ class SocketService {
         !await Permission.notification.isPermanentlyDenied) {
       await [Permission.notification].request();
     }
+
     const AndroidInitializationSettings android =
         AndroidInitializationSettings("@mipmap/ic_launcher");
     const DarwinInitializationSettings ios = DarwinInitializationSettings(
@@ -64,37 +66,70 @@ class SocketService {
     );
     final InitializationSettings settings =
         InitializationSettings(android: android, iOS: ios);
+
+    await _local.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        if (response.payload != null) {
+          // 메모 목록 불러오기
+          await _fetchMemos();
+
+          final memoId = response.payload!;
+          await _fetchMemos();
+          Color? memoColor;
+          for (var memo in memos) {
+            if (memo['memo_id'] == memoId) {
+              memoColor = memo['color'];
+              break;
+            }
+          }
+
+          // 네비게이션 처리
+          MyApp.navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (context) => WriteMemoScreen(
+                initialMemoId: memoId,
+                initialColor: memoColor,
+              ),
+            ),
+          );
+
+          // 알림 클릭 시 로그를 출력
+          print('Notification clicked for memo ID: $memoId');
+        }
+      },
+    );
   }
 
-  Future<void> _sendNotification(String status, String message) async {
-    // 고유한 알림 ID를 생성 (현재 시간을 사용)
+  Future<void> _sendNotification(String status, String message,
+      [String? memoId]) async {
     int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    await _local.show(notificationId, status, message, details);
+    await _local.show(notificationId, status, message, details,
+        payload: memoId);
   }
 
   void _initializeSocket() {
+    // 소켓 서버와의 연결 설정
     socket = IO.io('$SERVER_IP', <String, dynamic>{
       'transports': ['websocket'],
-      'autoConnect': false,
+      'autoConnect': false, // autoConnect: false 설정
     });
 
-    socket!.connect();
+    socket!.connect(); // 소켓 연결 시도
 
+    // 소켓 연결 성공 확인
     socket!.on('connect', (_) {
-      print('Connected to server');
+      print('Connected to server'); // 연결 성공시 로그
       String user = USER_ID + ";" + USER_NAME;
-      print(user);
       socket!.emit('join-room', user);
     });
 
-    // 친구 추가 알림
     socket!.on('add-friend', (data) {
       print('Received notification: $data');
       _sendNotification('친구 추가', data);
     });
 
-    // 'new-memo' 이벤트에서 받은 memoId와 fetchMemos에서 불러온 memoId 비교 후 색상 찾기
     socket!.on('new-memo', (data) async {
       print('Received message: $data');
       if (data is List && data.length >= 2) {
@@ -105,27 +140,7 @@ class SocketService {
         print('Received memoId: $memoId');
 
         // 알림 표시
-        _sendNotification('메모 수신', message);
-
-        // 메모 목록 불러오기
-        await _fetchMemos();
-
-        // 불러온 메모 목록에서 memoId를 비교하여 색상 찾기
-        Color? memoColor;
-        for (var memo in memos) {
-          if (memo['memo_id'] == memoId) {
-            memoColor = memo['color']; // memoId가 일치하는 메모의 색상 저장
-            break;
-          }
-        }
-
-        // WriteMemoScreen으로 해당 메모 ID와 색상을 전달하여 화면 열기
-        MyApp.navigatorKey.currentState?.push(MaterialPageRoute(
-          builder: (context) => WriteMemoScreen(
-            initialMemoId: memoId, // 메모 ID 전달
-            initialColor: memoColor, // 메모 색상 전달
-          ),
-        ));
+        _sendNotification('메모가 도착했어요!', message, memoId);
       } else {
         print('Unexpected data format');
       }
@@ -139,19 +154,15 @@ class SocketService {
       _sendNotification('화상회의 초대', message);
     });
 
+    // 소켓 연결 실패 시 에러 로그
     socket!.on('connect_error', (error) {
-      print('Connection Error: $error');
+      print('Connection Error: $error'); // 연결 실패시 로그
     });
 
+    // 소켓 연결 끊김 확인
     socket!.on('disconnect', (_) {
-      print('Disconnected from server');
+      print('Disconnected from server'); // 연결 끊김 로그
     });
-
-    socket!.on(
-        'existing_clients', (clients) => {print('Existing clients: $clients')});
-
-    socket!.on(
-        'new_client', (clientId) => {print('New client joined: $clientId')});
   }
 
   Future<void> _fetchMemos() async {
