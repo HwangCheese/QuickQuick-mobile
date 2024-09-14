@@ -20,7 +20,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
-import '../../globals.dart';
+import '../../../globals.dart';
 import '../calendar/calendar_screen.dart';
 import 'media_viewer.dart';
 import 'package:intl/intl.dart';

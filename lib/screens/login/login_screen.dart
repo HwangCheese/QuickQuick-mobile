@@ -1,7 +1,7 @@
 import 'dart:convert'; // jsonEncode를 사용하기 위해 import
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../globals.dart';
+import '../../../globals.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:http/http.dart' as http;

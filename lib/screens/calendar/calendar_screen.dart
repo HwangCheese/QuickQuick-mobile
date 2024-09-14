@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../globals.dart';
+import '../../../globals.dart';
 import '../write_memo/write_memo_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
