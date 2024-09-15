@@ -5,7 +5,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
-import '/write_memo/write_memo_screen.dart';
+import 'package:sticker_memo/screens/video_call/video_call_screen.dart';
+import 'package:sticker_memo/screens/write_memo/write_memo_screen.dart';
 import './globals.dart';
 import 'main.dart';
 
@@ -71,38 +72,43 @@ class SocketService {
       settings,
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         if (response.payload != null) {
-          // 메모 목록 불러오기
-          await _fetchMemos();
-
-          final memoId = response.payload!;
-          await _fetchMemos();
-          Color? memoColor;
-          for (var memo in memos) {
-            if (memo['memo_id'] == memoId) {
-              memoColor = memo['color'];
-              break;
-            }
-          }
-
-          // 네비게이션 처리
-          MyApp.navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (context) => WriteMemoScreen(
-                initialMemoId: memoId,
-                initialColor: memoColor,
+          String payload = response.payload!;
+          if (payload.startsWith('https')) {
+            // If the payload is a URL, open VideoCallScreen with the URL
+            MyApp.navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => VideoCallScreen(
+                  initialUrl: payload,
+                ),
               ),
-            ),
-          );
-
-          // 알림 클릭 시 로그를 출력
-          print('Notification clicked for memo ID: $memoId');
+            );
+          } else {
+            // Existing memo handling code
+            await _fetchMemos();
+            final memoId = payload;
+            Color? memoColor;
+            for (var memo in memos) {
+              if (memo['memo_id'] == memoId) {
+                memoColor = memo['color'];
+                break;
+              }
+            }
+            MyApp.navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => WriteMemoScreen(
+                  initialMemoId: memoId,
+                  initialColor: memoColor,
+                ),
+              ),
+            );
+          }
         }
       },
     );
   }
 
-  Future<void> _sendNotification(String status, String message,
-      [String? memoId]) async {
+  Future<void> _sendNotification(
+      String status, String message, String? memoId) async {
     int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     await _local.show(notificationId, status, message, details,
@@ -127,7 +133,7 @@ class SocketService {
 
     socket!.on('add-friend', (data) {
       print('Received notification: $data');
-      _sendNotification('친구 추가', data);
+      _sendNotification('친구 추가', data, null);
     });
 
     socket!.on('new-memo', (data) async {
@@ -147,11 +153,11 @@ class SocketService {
     });
 
     socket!.on('kock', (message) {
-      _sendNotification('콕!', message);
+      _sendNotification('콕!', message, null);
     });
 
     socket!.on('invite', (message) {
-      _sendNotification('화상회의 초대', message);
+      _sendNotification('화상회의 초대', message, message);
     });
 
     // 소켓 연결 실패 시 에러 로그
