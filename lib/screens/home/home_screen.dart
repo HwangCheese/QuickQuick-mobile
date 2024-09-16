@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> memos = [];
   List<Map<String, dynamic>> datas = [];
   List<Map<String, dynamic>> filteredMemos = [];
-  Map<int, String> memoTexts = {};
+  Map<String, String> memoTexts = {};
   Map<String, Map<String, dynamic>> memoDetailsMap = {};
   List<VideoPlayerController?> _homeVideoControllers = [];
   bool isSelectionMode = false;
@@ -94,12 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         await Future.wait(fetchDetailFutures);
-
-        // 정렬된 리스트를 얻고 Map을 다시 생성
-        List<MapEntry<int, String>> sortedEntries = memoTexts.entries.toList()
-          ..sort((a, b) => b.key.compareTo(a.key));
-
-        memoTexts = Map.fromEntries(sortedEntries);
       } else {
         print('Failed to load memos: ${response.statusCode}');
       }
@@ -132,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (item['format'] == 'txt') {
             String dataId = item['data_id'];
             String? textContent = await _getData(dataId);
-            memoTexts[memoIndex] = textContent!;
+            memoTexts[memoId] = textContent ?? "";
           }
         }
 
@@ -326,37 +320,25 @@ class _HomeScreenState extends State<HomeScreen> {
         filteredMemos = memos;
       } else {
         filteredMemos = memos.where((memo) {
-          // 미디어가 포함된 메모는 검색 결과에서 제외
-          bool hasMedia = memo['hasMedia'] ?? false;
-          if (hasMedia) {
-            return false; // 미디어가 포함된 메모는 결과에서 제외
+          String memoId = memo['memo_id'];
+          String? memoText = memoTexts.containsKey(memoId)
+              ? memoTexts[memoId]!.trim().toLowerCase()
+              : "";
+
+          // memoText가 비어 있으면 검색 결과에서 제외
+          if (memoText.isEmpty) {
+            return false;
           }
 
           String memoTitle = memo['title'].toLowerCase();
-          int originalIndex = memos.indexOf(memo);
-
-          String? memoText = memoTexts.containsKey(originalIndex)
-              ? memoTexts[originalIndex]!.toLowerCase()
-              : "";
-
+          // 특정 메모의 텍스트만을 검색어와 비교
           return memoTitle.contains(query) || memoText.contains(query);
         }).toList();
       }
     });
   }
 
-  void _reindexMemoTexts() {
-    // 새로운 인덱스 순서대로 정렬
-    final sortedEntries = memoTexts.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key)); // 기존 인덱스 순서대로 정렬
-
-    // 새로운 인덱스를 할당
-    memoTexts = {};
-    int newIndex = 0;
-    for (var entry in sortedEntries) {
-      memoTexts[newIndex++] = entry.value;
-    }
-  }
+  void _reindexMemoTexts() {}
 
   // void _reindexMemoTexts() {
   //   // 기존 memoTexts의 인덱스를 1씩 증가시킴
@@ -415,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _deleteMemoFromServer(String memoId) async {
-    if (memoId == null) return;
+    if (memoId.isEmpty) return;
 
     final url = Uri.parse('$SERVER_IP/memo/$memoId');
     final response = await http.delete(url);
@@ -424,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
       print('메모 삭제 성공');
       setState(() {
         memos.removeWhere((memo) => memo['memo_id'] == memoId);
-        memoTexts.remove(index);
+        memoTexts.remove(memoId);
         _reindexMemoTexts();
       });
       await _fetchMemos();
@@ -742,8 +724,10 @@ class _HomeScreenState extends State<HomeScreen> {
       memos[index]['isPinned'] = !isPinned;
 
       if (memos[index]['isPinned']) {
-        // 고정된 메모 목록에 추가
+        // 고정된 메모 목록에 추가 (originalIndex 포함)
         pinnedMemoIds.add(memoId);
+        memos[index]['pinnedOriginalIndex'] =
+            memos[index]['originalIndex']; // 원래 인덱스 저장
 
         // 고정된 메모를 맨 위로 이동
         var memo = memos.removeAt(index);
@@ -751,13 +735,12 @@ class _HomeScreenState extends State<HomeScreen> {
         memos.insert(0, memo);
         datas.insert(0, data); // 데이터도 상단으로 이동
       } else {
-        // 고정 해제 시 목록에서 제거
-        pinnedMemoIds.remove(memoId);
-
         // 고정 해제 시 원래 위치로 되돌림
+        pinnedMemoIds.remove(memoId);
+        int originalIndex = memos[index]['pinnedOriginalIndex'] ??
+            memos[index]['originalIndex']; // 저장된 originalIndex로 복원
         var memo = memos.removeAt(index);
         var data = datas.removeAt(index); // 데이터도 함께 이동
-        int originalIndex = memo['originalIndex'];
         memos.insert(originalIndex, memo);
         datas.insert(originalIndex, data); // 데이터도 원래 위치로 이동
       }
@@ -961,7 +944,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => VideoCallScreen(
-                              selectedFriendIds: selectedFriendNames),
+                            selectedFriendIds: selectedFriendNames,
+                          ),
                         ),
                       );
                     },
@@ -1234,59 +1218,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       Color memoColor = currentMemos[index]['color'] ??
                           Colors.white; // Default color
 
+                      String memoId = currentMemos[index]['memo_id'];
                       List<Map<String, dynamic>> memoDatas = datas
                           .where((data) =>
-                              data['originalIndex'] == index.toString())
+                              data['originalIndex'] ==
+                              memos
+                                  .indexWhere((m) => m['memo_id'] == memoId)
+                                  .toString())
                           .expand((data) => data['data'])
                           .map<Map<String, dynamic>>(
                               (item) => item as Map<String, dynamic>)
                           .toList();
-
-                      FutureBuilder<Map<String, dynamic>?>(
-                        future: _getFirstMedia(memoDatas, index),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.done) {
-                            if (snapshot.hasData &&
-                                snapshot.data != null &&
-                                snapshot.data!.isNotEmpty) {
-                              final firstMedia = snapshot.data!;
-                              return FutureBuilder<Widget>(
-                                future: _getDataWidget(
-                                  currentMemos[index]['title'],
-                                  firstMedia['data_id'],
-                                  firstMedia['format'],
-                                  index,
-                                ),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.done) {
-                                    if (snapshot.hasData &&
-                                        currentMemos[index]['is_read'] != 1) {
-                                      return Text(
-                                        currentMemos[index]['sender_user_id'],
-                                        style: TextStyle(
-                                            fontSize: 16.0,
-                                            fontWeight: FontWeight.bold),
-                                      );
-                                    } else if (snapshot.hasData) {
-                                      return snapshot.data!;
-                                    } else {
-                                      return Text('데이터를 불러올 수 없습니다.');
-                                    }
-                                  } else {
-                                    return Text('');
-                                  }
-                                },
-                              );
-                            } else {
-                              return Text('', style: TextStyle(fontSize: 16.0));
-                            }
-                          } else {
-                            return Text('');
-                          }
-                        },
-                      );
 
                       return GestureDetector(
                         onTap: isSelectionMode
@@ -1331,7 +1273,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                             if (dataWidgetSnapshot
                                                     .connectionState ==
                                                 ConnectionState.done) {
-                                              if (dataWidgetSnapshot.hasData) {
+                                              if (dataWidgetSnapshot.hasData &&
+                                                  currentMemos[index]
+                                                          ['is_read'] !=
+                                                      1) {
+                                                return Text(
+                                                  currentMemos[index]
+                                                      ['sender_user_id'],
+                                                  style: TextStyle(
+                                                      fontSize: 16.0,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                );
+                                              } else if (dataWidgetSnapshot
+                                                  .hasData) {
                                                 return dataWidgetSnapshot.data!;
                                               } else {
                                                 return Text('데이터를 불러올 수 없습니다.');
@@ -1465,12 +1420,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 result['text'].isNotEmpty) {
               setState(() {
                 result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
-
-                memoTexts[0] = result['text'];
+                memoTexts[result['memo_id']] = result['text']; // memo_id를 키로 사용
               });
               _sortMemos();
-            } else if (result == null) {
-              memoTexts[0] = '';
             }
             memos.insert(0, result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
 
