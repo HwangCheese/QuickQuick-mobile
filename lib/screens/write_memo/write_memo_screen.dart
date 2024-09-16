@@ -20,7 +20,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
-import '../../../globals.dart';
+import '../../globals.dart';
 import '../calendar/calendar_screen.dart';
 import 'media_viewer.dart';
 import 'package:intl/intl.dart';
@@ -464,10 +464,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     // 메시지 배열을 설정하여 요약 요청
     final messages = [
-      {
-        'role': 'system',
-        'content': 'You are a helpful assistant who summarizes text.'
-      },
+      {'role': 'system', 'content': 'summarize result'},
       {'role': 'user', 'content': _controller.text}
     ];
 
@@ -477,22 +474,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $openapiKey',
-          'Accept-Charset': 'UTF-8', // UTF-8 인코딩 요청
         },
         body: jsonEncode({
           'model': 'gpt-3.5-turbo',
           'messages': messages,
-          'max_tokens': 100, // 요약 길이 조정
+          'max_tokens': 500, // 요약 길이 조정
           'temperature': 0.7, // 생성 다양성 조정
         }),
       );
 
       if (response.statusCode == 200) {
-        final responseBody = response.body;
+        final responseBody = utf8.decode(response.bodyBytes);
         print('Raw response body: $responseBody'); // 응답 본문 출력
 
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(responseBody);
         final summary = data['choices'][0]['message']['content'].trim();
+        print(summary);
         setState(() {
           _summary = summary;
         });
@@ -1757,68 +1754,75 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                             ),
                           ],
                         ),
-                        child: Column(
-                          children: [
-                            if (_mediaPaths.isNotEmpty ||
-                                _fetchedImages.isNotEmpty)
-                              SizedBox(
-                                height: screenHeight * 0.25, // 미디어 영역의 높이 고정
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: _mediaPaths.length,
-                                  itemBuilder: (context, index) {
-                                    return _buildMediaTile(
-                                        _mediaPaths[index], index);
-                                  },
-                                ),
-                              ),
-                            if (_filePaths.isNotEmpty)
-                              Expanded(
-                                child: ListView.builder(
-                                  padding: EdgeInsets.all(8.0),
-                                  itemCount: _filePaths.length,
-                                  itemBuilder: (context, index) {
-                                    return _buildFileTile(_filePaths[index],
-                                        index + _mediaPaths.length, index);
-                                  },
-                                ),
-                              ),
-                            if (_isMediaSelected && _imageData != null)
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                                constraints: BoxConstraints(
-                                  maxWidth: screenWidth * 0.9,
-                                  maxHeight: screenHeight * 0.4,
-                                ),
-                                child: Image.memory(
-                                  _imageData!,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            if (!_isMediaSelected || _imageData == null)
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  child: TextField(
-                                    controller: _controller,
-                                    maxLines: null,
-                                    focusNode: _focusNode,
-                                    onChanged: (text) {
-                                      _handleTextChanged(); // 텍스트가 변경될 때마다 요약 추천 체크
+                        child: GestureDetector(
+                          onTap: () {
+                            FocusScope.of(context)
+                                .requestFocus(_focusNode); // 텍스트 필드에 포커스를 줌
+                          },
+                          child: Column(
+                            children: [
+                              if (_mediaPaths.isNotEmpty ||
+                                  _fetchedImages.isNotEmpty)
+                                SizedBox(
+                                  height: screenHeight * 0.25, // 미디어 영역의 높이 고정
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: _mediaPaths.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildMediaTile(
+                                          _mediaPaths[index], index);
                                     },
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: '메모를 입력하세요...',
-                                      contentPadding: EdgeInsets.only(
-                                          left: 16.0), // 왼쪽 여백 추가
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: 16.0,
-                                      color: Colors.black,
+                                  ),
+                                ),
+                              if (_filePaths.isNotEmpty)
+                                Expanded(
+                                  child: ListView.builder(
+                                    padding: EdgeInsets.all(8.0),
+                                    itemCount: _filePaths.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildFileTile(_filePaths[index],
+                                          index + _mediaPaths.length, index);
+                                    },
+                                  ),
+                                ),
+                              if (_isMediaSelected && _imageData != null)
+                                Container(
+                                  padding:
+                                      EdgeInsets.symmetric(horizontal: 16.0),
+                                  constraints: BoxConstraints(
+                                    maxWidth: screenWidth * 0.9,
+                                    maxHeight: screenHeight * 0.4,
+                                  ),
+                                  child: Image.memory(
+                                    _imageData!,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              if (!_isMediaSelected || _imageData == null)
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    child: TextField(
+                                      controller: _controller,
+                                      maxLines: null,
+                                      focusNode: _focusNode,
+                                      onChanged: (text) {
+                                        _handleTextChanged(); // 텍스트가 변경될 때마다 요약 추천 체크
+                                      },
+                                      decoration: InputDecoration(
+                                        border: InputBorder.none,
+                                        hintText: '메모를 입력하세요...',
+                                        contentPadding: EdgeInsets.only(
+                                            left: 16.0), // 왼쪽 여백 추가
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 16.0,
+                                        color: Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
