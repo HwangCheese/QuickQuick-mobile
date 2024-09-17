@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -71,7 +72,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String _transcription = ''; // 트랜스크립션 결과를 저장할 변수
   bool _shouldShowTranslationRecommendation = false;
   Timer? _debounce; // 타이머를 관리할 변수 추가
-  RichText? _richText;
+  List<String> _detectedUrls = [];
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -134,6 +135,28 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       String text = _controller.text;
 
+      // Reset the detected URLs
+      List<String> urls = [];
+
+      // URL 정규 표현식
+      RegExp urlRegExp = RegExp(
+        r'(https?:\/\/[^\s]+)',
+        caseSensitive: false,
+        multiLine: true,
+      );
+
+      Iterable<RegExpMatch> matches = urlRegExp.allMatches(text);
+
+      for (RegExpMatch match in matches) {
+        String url = match.group(0)!;
+        urls.add(url);
+      }
+
+      setState(() {
+        _detectedUrls = urls;
+      });
+
+      // Existing logic for summary and translation recommendations
       Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
 
       // 요약 추천 로직 (100자 이상 입력 시)
@@ -182,45 +205,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         // 텍스트가 비면 감지된 언어 초기화
         _currentDetectedLanguages.clear();
       }
-
-      // URL 감지 및 하이퍼링크 처리
-      _handleUrlDetection(text);
-    });
-  }
-
-  void _handleUrlDetection(String text) {
-    final RegExp urlRegExp = RegExp(r'(https?://\S+)');
-    List<TextSpan> spans = [];
-    int start = 0;
-
-    for (Match match in urlRegExp.allMatches(text)) {
-      if (match.start > start) {
-        spans.add(TextSpan(
-          text: text.substring(start, match.start),
-          style: TextStyle(color: Colors.black),
-        ));
-      }
-      spans.add(TextSpan(
-        text: match.group(0),
-        style:
-            TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () => _launchURL(match.group(0)!),
-      ));
-      start = match.end;
-    }
-
-    if (start < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(start),
-        style: TextStyle(color: Colors.black),
-      ));
-    }
-
-    setState(() {
-      _richText = RichText(
-        text: TextSpan(children: spans),
-      );
     });
   }
 
@@ -1352,24 +1336,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
-//   void _removeAudio(int index) {
-//   setState(() {
-//     // 오디오 플레이어가 있을 경우 정리합니다.
-//     if (_audioPlayers.isNotEmpty && _audioPlayers.length > index && _audioPlayers[index] != null) {
-//       _audioPlayers[index]?.dispose();
-//       _audioPlayers.removeAt(index);
-//     }
-
-//     // 오디오 파일 경로를 리스트에서 제거합니다.
-//     if (_audioPath.length > index) {
-//       _audioPath.removeAt(index);
-//     }
-
-//     // 선택된 미디어 인덱스를 초기화합니다.
-//     _selectedMediaIndex = null;
-//   });
-// }
-
   // 제목 생성 함수
   Future<String> generateTitle(String text) async {
     if (text.trim().isEmpty) {
@@ -1837,7 +1803,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                               if (!_isMediaSelected || _imageData == null)
                                 Expanded(
                                   child: SingleChildScrollView(
-                                    child: TextField(
+                                    child: ExtendedTextField(
                                       controller: _controller,
                                       maxLines: null,
                                       focusNode: _focusNode,
@@ -1861,6 +1827,28 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           ),
                         ),
                       ),
+                      if (_detectedUrls.isNotEmpty)
+                        Container(
+                          width: screenWidth * 0.9,
+                          padding: EdgeInsets.symmetric(vertical: 10.0),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: _detectedUrls.map((url) {
+                              return ElevatedButton(
+                                onPressed: () {
+                                  _launchURL(url);
+                                },
+                                child: Text(
+                                  url.length > 30
+                                      ? '${url.substring(0, 30)}...'
+                                      : url,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
                         SizedBox(height: 20.0),
                       if (_summary.isNotEmpty)
