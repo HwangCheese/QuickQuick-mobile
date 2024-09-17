@@ -713,7 +713,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     // 메모 ID가 없으면 새로 생성
     widget.initialMemoId ??= _generateRandomId(); // 랜덤 메모 ID 생성
-    String generatedTitle = generateTitle(_controller.text.isEmpty
+    String generatedTitle = await generateTitle(_controller.text.isEmpty
         ? '미디어 메모' // 텍스트가 없을 경우 기본 제목 설정
         : _controller.text);
     print('메모 제목: $generatedTitle');
@@ -1350,45 +1350,56 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 // }
 
   // 제목 생성 함수
-  String generateTitle(String text) {
+  Future<String> generateTitle(String text) async {
     if (text.trim().isEmpty) {
       return "제목 없음"; // 기본 제목 설정
-    } else if (text.trim().length <= 15) {
-      return text.trim();
     }
 
-    List<String> keyPhrases = extractKeyPhrases(text);
+    final url = 'https://api.openai.com/v1/chat/completions';
 
-    // 불용어 리스트를 정의합니다.
-    List<String> stopWords = [
-      "이",
-      "그",
-      "저",
-      "은",
-      "는",
-      "이",
-      "가",
-      "을",
-      "를",
-      "에",
-      "의",
-      "과",
-      "와"
+    // 메시지 배열을 설정하여 제목 요청
+    final messages = [
+      {
+        'role': 'system',
+        'content':
+            'Generate a concise title with a maximum of 15 characters based on the content.'
+      },
+      {'role': 'user', 'content': text}
     ];
 
-    // 키워드에서 중요하지 않은 단어들을 제거하고 중요한 단어들을 조합하여 제목을 생성합니다.
-    List<String> importantWords =
-        keyPhrases.where((word) => !stopWords.contains(word)).take(3).toList();
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $openapiKey',
+        },
+        body: jsonEncode({
+          'model': 'gpt-3.5-turbo',
+          'messages': messages,
+          'max_tokens': 20, // 제목은 짧으므로 token 제한을 낮게 설정
+          'temperature': 0.7, // 생성 다양성 조정
+        }),
+      );
 
-    // 중요한 단어들을 조합하여 제목을 생성합니다.
-    String title = importantWords.join(' ');
+      if (response.statusCode == 200) {
+        final responseBody = utf8.decode(response.bodyBytes);
+        final data = jsonDecode(responseBody);
+        String generatedTitle = data['choices'][0]['message']['content'].trim();
 
-    // 제목이 비어 있거나 15자보다 길다면 15자까지 자릅니다.
-    if (title.isEmpty || title.length > 15) {
-      title = text.trim().substring(0, 15);
+        // 제목이 15자를 넘을 경우 잘라내기
+        if (generatedTitle.length > 15) {
+          generatedTitle = generatedTitle.substring(0, 15);
+        }
+
+        return generatedTitle;
+      } else {
+        throw Exception('Failed to generate title');
+      }
+    } catch (e) {
+      print('Error occurred: $e');
+      return "제목 생성 실패"; // 실패 시 기본 제목 반환
     }
-
-    return title;
   }
 
   List<String> extractKeyPhrases(String text) {
