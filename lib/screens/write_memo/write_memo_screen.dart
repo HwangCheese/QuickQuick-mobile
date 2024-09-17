@@ -774,9 +774,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   bool _isEventLine(String line) {
-    // 여러 이벤트를 처리할 수 있도록 정규식 수정
-    RegExp pattern =
-        RegExp(r'^(1[0-2]|[1-9])[월./] ?(\d{1,2})[일]? ?(.+)$', multiLine: true);
+    RegExp pattern = RegExp(
+        r'(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2}))?\s+(.+)$',
+        multiLine: true);
     return pattern.hasMatch(line);
   }
 
@@ -809,52 +809,73 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
-  void _processEventLine(String line) async {
-    // 여러 이벤트를 인식하도록 정규식을 사용하여 모든 매치 찾기
+  Future<void> _processEventLine(String line) async {
+    // 개선된 정규식 패턴 (연도 포함, 다양한 구분자 허용)
     RegExp pattern = RegExp(
-        r'(\d{1,2})월 (\d{1,2})일(?:\s+(\d{1,2}):(\d{1,2}))?\s+(.+?)(?=\s+\d{1,2}월|\Z)');
+        r'(?:(\d{4})년\s*)?(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2}))?\s+(.+)',
+        multiLine: true);
     Iterable<Match> matches = pattern.allMatches(line);
+
+    print('Processing line: "$line"');
+    print('Number of matches: ${matches.length}');
 
     if (matches.isNotEmpty) {
       for (Match match in matches) {
-        int month = int.parse(match.group(1)!);
-        int day = int.parse(match.group(2)!);
-        int hour = match.group(3) != null ? int.parse(match.group(3)!) : 0;
-        int minute = match.group(4) != null ? int.parse(match.group(4)!) : 0;
-        String eventDescription = match.group(5)!;
+        print('Match found: "${match.group(0)}"');
 
-        // 연도를 2024로 고정
-        DateTime eventDate = DateTime(2024, month, day, hour, minute);
+        String? yearStr = match.group(1);
+        int year = yearStr != null ? int.parse(yearStr) : DateTime.now().year;
+        int month = int.parse(match.group(2)!);
+        int day = int.parse(match.group(3)!);
+        int hour = match.group(4) != null ? int.parse(match.group(4)!) : 0;
+        int minute = match.group(5) != null ? int.parse(match.group(5)!) : 0;
+        String eventDescription = match.group(6)!;
 
-        // 이벤트 날짜와 시간을 적절한 형식으로 변환 (입력된 시간이 없는 경우 00:00:00)
-        String eventDateTimeString =
-            DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate);
-
-        // 서버로 보낼 데이터를 JSON으로 변환
-        Map<String, String> eventData = {
-          'user_id': USER_ID,
-          'event_datetime': eventDateTimeString,
-          'description': eventDescription,
-        };
-
-        // HTTP POST 요청
+        // 유효한 날짜인지 확인
         try {
+          DateTime eventDate = DateTime(
+            year,
+            month,
+            day,
+            hour,
+            minute,
+          );
+
+          // 서버로 보낼 데이터를 JSON으로 변환
+          Map<String, String> eventData = {
+            'user_id': USER_ID,
+            'event_datetime':
+                DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate),
+            'description': eventDescription,
+          };
+
+          // HTTP POST 요청
           var response = await http.post(
             Uri.parse('$SERVER_IP/events'),
             headers: {"Content-Type": "application/json"},
             body: jsonEncode(eventData),
           );
 
-          if (response.statusCode == 200) {
+          print('Response status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+
+          if (response.statusCode >= 200 && response.statusCode < 300) {
             print('Event added successfully: ${response.body}');
           } else {
             print('Failed to add event: ${response.statusCode}');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('이벤트 추가 실패: ${response.statusCode}')),
+            );
           }
         } catch (e) {
-          print('Error occurred: $e');
+          print('Invalid date or error occurred: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('유효하지 않은 날짜 형식 또는 오류 발생: $e')),
+          );
         }
       }
     } else {
+      // 매칭되지 않았을 경우 메시지 표시
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('일정 형식이 올바르지 않습니다.')),
       );
