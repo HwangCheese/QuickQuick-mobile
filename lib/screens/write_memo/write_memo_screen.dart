@@ -1376,6 +1376,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       return "제목 없음"; // 기본 제목 설정
     }
 
+    if (text.length <= 15) {
+      return text;
+    }
+
     final url = 'https://api.openai.com/v1/chat/completions';
 
     // 메시지 배열을 설정하여 제목 요청
