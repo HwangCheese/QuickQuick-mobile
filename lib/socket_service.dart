@@ -84,19 +84,30 @@ class SocketService {
               ),
             );
           } else if (payload == 'add-friend') {
-            // Navigate to FriendsListScreen and show Add Friend dialog
-            MyApp.navigatorKey.currentState
-                ?.push(
-              MaterialPageRoute(
-                builder: (context) => FriendsListScreen(),
-              ),
-            )
-                .then((_) {
-              FriendsListScreenState? state = MyApp
-                  .navigatorKey.currentState?.context
-                  .findAncestorStateOfType<FriendsListScreenState>();
-              state?.showAddFriendDialog();
-            });
+            final friendsList = await _fetchFriends();
+            bool isAlreadyFriend = friendsList
+                .any((friend) => friend['friend_user_name'] == USER_NAME);
+
+            if (!isAlreadyFriend) {
+              MyApp.navigatorKey.currentState
+                  ?.push(
+                MaterialPageRoute(
+                  builder: (context) => FriendsListScreen(),
+                ),
+              )
+                  .then((_) {
+                FriendsListScreenState? state = MyApp
+                    .navigatorKey.currentState?.context
+                    .findAncestorStateOfType<FriendsListScreenState>();
+                state?.showAddFriendDialog();
+              });
+            } else {
+              MyApp.navigatorKey.currentState?.push(
+                MaterialPageRoute(
+                  builder: (context) => FriendsListScreen(),
+                ),
+              );
+            }
           } else if (payload == 'kock') {
             MyApp.navigatorKey.currentState?.push(
               MaterialPageRoute(
@@ -210,6 +221,24 @@ class SocketService {
       }
     } catch (e) {
       print('Failed to load memos: $e');
+    }
+  }
+
+  Future<List<Map<String, String>>> _fetchFriends() async {
+    final response = await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+
+      return data.map<Map<String, String>>((friend) {
+        return {
+          'friend_user_name': friend['friend_user_name'] ?? '',
+          'friend_id': friend['friend_id'] ?? '',
+        };
+      }).toList();
+    } else {
+      print('Failed to load friends');
+      return [];
     }
   }
 }
