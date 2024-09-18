@@ -959,28 +959,43 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     return pattern.hasMatch(line);
   }
 
-  void _showEventConfirmationDialog(String line) {
-    showDialog(
+  // 변경 후
+  Future<void> _showMultiEventConfirmationDialog(
+      List<String> eventLines) async {
+    return showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('일정 추가 확인'),
-          content: Text('이 내용을 캘린더에 추가하시겠습니까?\n$line'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('취소'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).popUntil((route) => route.isFirst);
+          title: Text('추가된 일정'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: eventLines.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(eventLines[index]),
+                );
               },
             ),
+          ),
+          actions: <Widget>[
             TextButton(
-              child: Text('추가'),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                _processEventLine(line); // 비동기 함수 호출
-                Navigator.of(context).popUntil((route) => route.isFirst);
+              onPressed: () {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
               },
+              child: Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+                for (String line in eventLines) {
+                  await _processEventLine(line); // 각 일정을 처리
+                }
+                Navigator.of(context)
+                    .popUntil((route) => route.isFirst); // 홈으로 돌아가기
+              },
+              child: Text('추가'),
             ),
           ],
         );
@@ -988,7 +1003,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
-  void _processEventLine(String line) async {
+  Future<void> _processEventLine(String line) async {
     // 여러 개의 일정 구문을 처리하기 위한 정규식
     RegExp pattern = RegExp(
       r'(?:(\d{4})[년./-]\s*)?(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2})|(\d{1,2})시\s*(\d{1,2})분)?\s+([^\d]+)',
@@ -1573,11 +1588,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     List<String> urls = _extractUrls(text);
     String combinedContent = text;
 
-    // 각 URL의 내용을 가져와 결합
+    // 각 URL의 내용을 가져와 결합 (URL은 제거하고, 그 내부 내용을 combinedContent에 포함)
     for (String url in urls) {
       String? urlContent = await _fetchUrlContent(url);
       if (urlContent != null && urlContent.isNotEmpty) {
-        combinedContent += '\n\nURL 내용:\n' + urlContent;
+        combinedContent = combinedContent.replaceAll(url, ''); // URL 제거
+        combinedContent += '\n\nURL 내용:\n' + urlContent; // URL 내용 추가
       }
     }
 
@@ -1593,7 +1609,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       {
         'role': 'system',
         'content':
-            '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 15자 이내의 간결한 제목을 생성해 주세요. 제목은 한국어로 작성해 주세요.'
+            '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 15자 이내의 간결한 제목을 생성해 주세요. 쌍따옴표, 따옴표는 넣지 말아주세요. 제목은 한국어로 작성해 주세요.'
       },
       {'role': 'user', 'content': combinedContent}
     ];
@@ -1617,12 +1633,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         final responseBody = utf8.decode(response.bodyBytes);
         final data = jsonDecode(responseBody);
         String generatedTitle = data['choices'][0]['message']['content'].trim();
-
-        // 제목이 15자를 넘을 경우 잘라내기
-        if (generatedTitle.length > 15) {
-          generatedTitle = generatedTitle.substring(0, 15);
-        }
-
+        print('메모 제목: $generatedTitle');
         return generatedTitle;
       } else {
         throw Exception('Failed to generate title');
@@ -1886,12 +1897,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               onPressed: () async {
                 await _saveMemoToServer();
                 String currentText = _controller.text;
+                List<String> lines = currentText.split('\n'); // 텍스트를 줄 단위로 나눔
+                List<String> eventLines = [];
 
-                if (_isEventLine(currentText)) {
-                  // Show confirmation dialog if the input is a valid event line
-                  _showEventConfirmationDialog(currentText);
+                for (String line in lines) {
+                  if (_isEventLine(line.trim())) {
+                    eventLines.add(line.trim());
+                  }
+                }
+
+                if (eventLines.isNotEmpty) {
+                  _showMultiEventConfirmationDialog(eventLines);
                 } else {
-                  // If not a valid event line, navigate back immediately
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 }
               },
