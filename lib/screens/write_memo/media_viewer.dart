@@ -22,9 +22,6 @@ class _MediaViewerState extends State<MediaViewer> {
   bool _isImage = false;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
-  int _totalPages = 0;
-  int _currentPage = 0;
-  bool _isReady = false;
 
   @override
   void initState() {
