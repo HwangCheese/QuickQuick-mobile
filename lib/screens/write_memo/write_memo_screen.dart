@@ -181,11 +181,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         // 감지된 언어를 기존에 감지된 언어와 합치기
         _currentDetectedLanguages.addAll(detectedLanguages);
 
-        print(
-            'Current detected languages: $_currentDetectedLanguages'); // 감지된 전체 언어 확인
+        print('현재 감지된 언어들: $_currentDetectedLanguages'); // 감지된 전체 언어 확인
 
         // 여러 언어가 섞여 있으면 번역 버튼 표시
-        if (_currentDetectedLanguages.contains('ko') &&
+        if (detectedLanguages.contains('und')) {
+          setState(() {
+            _shouldShowTranslationRecommendation = false; // 'und'일 경우 번역 비활성화
+          });
+        } else if (_currentDetectedLanguages.contains('ko') &&
             _currentDetectedLanguages.length > 1) {
           setState(() {
             _shouldShowTranslationRecommendation = true;
@@ -225,34 +228,37 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final url =
         'https://translation.googleapis.com/language/translate/v2/detect?key=$apiKey';
 
+    // 텍스트를 단어 단위로 분리
+    List<String> words = text.split(RegExp(r'\s+'));
+
+    Set<String> detectedLanguages = {};
+
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'q': text}),
-      );
+      // 각 단어에 대해 언어 감지 수행
+      for (String word in words) {
+        final response = await http.post(
+          Uri.parse(url),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'q': word}),
+        );
 
-      print('Response status: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final detections = data['data']['detections'];
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final detections = data['data']['detections'];
-        final Set<String> detectedLanguages = {};
-
-        if (detections != null && detections.isNotEmpty) {
-          for (var detection in detections) {
-            for (var langData in detection) {
-              detectedLanguages.add(langData['language']);
+          if (detections != null && detections.isNotEmpty) {
+            for (var detection in detections) {
+              for (var langData in detection) {
+                detectedLanguages.add(langData['language']);
+              }
             }
           }
         }
-        print('Detected languages: $detectedLanguages');
-        return detectedLanguages;
-      } else {
-        throw Exception('Failed to detect languages');
       }
+      print('감지된 언어: $detectedLanguages');
+      return detectedLanguages;
     } catch (e) {
-      print('Error occurred: $e');
+      print('오류 발생: $e');
       return {'und'}; // 감지되지 않음
     }
   }
@@ -297,7 +303,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           'model': 'gpt-3.5-turbo',
           'messages': messages,
           'max_tokens': 4096, // 더 큰 토큰 수로 설정
-          'temperature': 0.5,
+          'temperature': 0.0,
         }),
       );
 
