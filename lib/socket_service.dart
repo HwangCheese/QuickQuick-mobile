@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
+import 'package:sticker_memo/screens/friends_list/friends_list_screen.dart';
 import 'package:sticker_memo/screens/video_call/video_call_screen.dart';
 import 'package:sticker_memo/screens/write_memo/write_memo_screen.dart';
 import './globals.dart';
@@ -82,8 +83,27 @@ class SocketService {
                 ),
               ),
             );
+          } else if (payload == 'add-friend') {
+            // Navigate to FriendsListScreen and show Add Friend dialog
+            MyApp.navigatorKey.currentState
+                ?.push(
+              MaterialPageRoute(
+                builder: (context) => FriendsListScreen(),
+              ),
+            )
+                .then((_) {
+              FriendsListScreenState? state = MyApp
+                  .navigatorKey.currentState?.context
+                  .findAncestorStateOfType<FriendsListScreenState>();
+              state?.showAddFriendDialog();
+            });
+          } else if (payload == 'kock') {
+            MyApp.navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (context) => FriendsListScreen(),
+              ),
+            );
           } else {
-            // Existing memo handling code
             await _fetchMemos();
             final memoId = payload;
             Color? memoColor;
@@ -133,7 +153,7 @@ class SocketService {
 
     socket!.on('add-friend', (data) {
       print('Received notification: $data');
-      _sendNotification('친구 추가', data, null);
+      _sendNotification('친구 추가', data, 'add-friend');
     });
 
     socket!.on('new-memo', (data) async {
@@ -153,11 +173,11 @@ class SocketService {
     });
 
     socket!.on('kock', (message) {
-      _sendNotification('콕!', message, null);
+      _sendNotification('콕!', message, 'kock');
     });
 
     socket!.on('invite', (message) {
-      _sendNotification('화상회의 초대', message, message);
+      _sendNotification('화상회의 초대', '화상 회의 요청이 왔어요!', message);
     });
 
     // 소켓 연결 실패 시 에러 로그
