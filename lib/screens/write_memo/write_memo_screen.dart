@@ -1540,14 +1540,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   void _removeMedia(int index) {
-    setState(() {
-      _mediaPaths.removeAt(index);
-      if (_videoControllers[index] != null) {
-        _videoControllers[index]?.dispose();
-        _videoControllers.removeAt(index);
-      }
-      _selectedMediaIndex = null;
-    });
+    if (index >= 0 && index < _mediaPaths.length) {
+      setState(() {
+        _mediaPaths.removeAt(index);
+        if (_videoControllers.length > index &&
+            _videoControllers[index] != null) {
+          _videoControllers[index]?.dispose();
+          _videoControllers.removeAt(index);
+        }
+        _selectedMediaIndex = null;
+      });
+    } else {
+      print('Invalid index: $index, _mediaPaths length: ${_mediaPaths.length}');
+    }
   }
 
   void _removeFile(int index) {
@@ -1921,28 +1926,34 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: Image.asset(
-                              'assets/images/insert_file.png',
+                            icon: SizedBox(
                               height: 90,
+                              width: 90,
+                              child:
+                                  Image.asset('assets/images/insert_file.png'),
                             ),
                             onPressed: _pickImageOrFile,
                           ),
                           IconButton(
                             iconSize: 30.0,
-                            icon: _isRecording
-                                ? Icon(Icons.stop, color: Colors.red)
-                                : Image.asset(
-                                    'assets/images/record_duck.png',
-                                    height: 90,
-                                  ),
+                            icon: SizedBox(
+                              height: 90,
+                              width: 90,
+                              child: _isRecording
+                                  ? Icon(Icons.stop,
+                                      color: Colors.red, size: 30)
+                                  : Image.asset(
+                                      'assets/images/record_duck.png'),
+                            ),
                             onPressed:
                                 _isRecording ? _stopRecording : _startRecording,
                           ),
                           IconButton(
                             iconSize: 30.0,
-                            icon: Image.asset(
-                              'assets/images/send_duck.png',
+                            icon: SizedBox(
                               height: 90,
+                              width: 90,
+                              child: Image.asset('assets/images/send_duck.png'),
                             ),
                             onPressed: _saveAndShareMemo,
                           ),
