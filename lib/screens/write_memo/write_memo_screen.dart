@@ -61,7 +61,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   bool _isMediaSelected = false;
   Uint8List? _imageData;
   int? _selectedMediaIndex;
-  List<Uint8List> _fetchedImages = [];
   List<VideoPlayerController?> _videoControllers = [];
   String _summary = '';
   String _originalText = '';
@@ -300,7 +299,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           'Authorization': 'Bearer $openapiKey',
         },
         body: jsonEncode({
-          'model': 'gpt-3.5-turbo',
+          'model': 'gpt-4',
           'messages': messages,
           'max_tokens': 4096, // 더 큰 토큰 수로 설정
           'temperature': 0.0,
@@ -356,7 +355,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       if (widget.initialImageData != null) {
         print('이미지 데이터 있음');
         _isMediaSelected = true;
-        _fetchedImages.add(widget.initialImageData!);
       }
     }
     setState(() {
@@ -868,13 +866,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
     }
 
-    // 이미지 파일 추가
-    for (var imageData in _fetchedImages) {
-      final imageFile = await _saveImageToFile(imageData);
-      request.files
-          .add(await http.MultipartFile.fromPath('files', imageFile.path));
-    }
-
     // 기타 파일 추가
     for (var filePath in _filePaths) {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
@@ -917,13 +908,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     // 미디어 파일 추가
     for (var filePath in mediaPaths) {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
-    }
-
-    // 이미지 파일 추가
-    for (var imageData in _fetchedImages) {
-      final imageFile = await _saveImageToFile(imageData);
-      request.files
-          .add(await http.MultipartFile.fromPath('files', imageFile.path));
     }
 
     // 기타 파일 추가
@@ -1241,15 +1225,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       final controller = VideoPlayerController.file(File(videoPath));
 
       controller.initialize().then((_) {
+        controller.setVolume(0.0);
+
         setState(() {
           _videoControllers[index] = controller;
-          _videoControllers[index]?.play(); // Auto-play the video
+          _videoControllers[index]?.play(); // 필요에 따라 자동 재생
         });
       }).catchError((error) {
-        print("Video initialization failed: $error");
+        print("비디오 초기화 실패: $error");
       });
     } catch (e) {
-      print("Error initializing video: $e");
+      print("비디오 초기화 중 오류 발생: $e");
     }
   }
 
@@ -1565,31 +1551,56 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  List<String> _extractUrls(String text) {
+    RegExp urlRegExp = RegExp(
+      r'(https?:\/\/[^\s]+)',
+      caseSensitive: false,
+      multiLine: true,
+    );
+
+    Iterable<RegExpMatch> matches = urlRegExp.allMatches(text);
+    List<String> urls = matches.map((match) => match.group(0)!).toList();
+    return urls;
+  }
+
   // 제목 생성 함수
   Future<String> generateTitle(String text) async {
     if (text.trim().isEmpty) {
       return "제목 없음"; // 기본 제목 설정
     }
 
-    if (text.length <= 15) {
-      return text;
+    // URL 추출
+    List<String> urls = _extractUrls(text);
+    String combinedContent = text;
+
+    // 각 URL의 내용을 가져와 결합
+    for (String url in urls) {
+      String? urlContent = await _fetchUrlContent(url);
+      if (urlContent != null && urlContent.isNotEmpty) {
+        combinedContent += '\n\nURL 내용:\n' + urlContent;
+      }
     }
 
-    final url = 'https://api.openai.com/v1/chat/completions';
+    // 텍스트가 15자 이하인 경우, URL 내용을 포함한 전체 텍스트로 제목 생성
+    if (combinedContent.length <= 15) {
+      return combinedContent;
+    }
+
+    final urlApi = 'https://api.openai.com/v1/chat/completions';
 
     // 메시지 배열을 설정하여 제목 요청
     final messages = [
       {
         'role': 'system',
         'content':
-            'Generate a concise title with a maximum of 15 characters based on the content. Please write in Korean.'
+            '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 15자 이내의 간결한 제목을 생성해 주세요. 제목은 한국어로 작성해 주세요.'
       },
-      {'role': 'user', 'content': text}
+      {'role': 'user', 'content': combinedContent}
     ];
 
     try {
       final response = await http.post(
-        Uri.parse(url),
+        Uri.parse(urlApi),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $openapiKey',
@@ -1597,8 +1608,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         body: jsonEncode({
           'model': 'gpt-3.5-turbo',
           'messages': messages,
-          'max_tokens': 20, // 제목은 짧으므로 token 제한을 낮게 설정
-          'temperature': 0.7, // 생성 다양성 조정
+          'max_tokens': 20, // 제목은 짧으므로 토큰 제한을 낮게 설정
+          'temperature': 0.5, // 생성 다양성 조정
         }),
       );
 
@@ -1930,18 +1941,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         children: [
                           IconButton(
                             icon: SizedBox(
-                              height: 90,
-                              width: 90,
+                              height: 100,
+                              width: 100,
                               child:
                                   Image.asset('assets/images/insert_file.png'),
                             ),
                             onPressed: _pickImageOrFile,
                           ),
                           IconButton(
-                            iconSize: 30.0,
                             icon: SizedBox(
-                              height: 90,
-                              width: 90,
+                              height: 100,
+                              width: 100,
                               child: _isRecording
                                   ? Icon(Icons.stop,
                                       color: Colors.red, size: 30)
@@ -1952,10 +1962,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 _isRecording ? _stopRecording : _startRecording,
                           ),
                           IconButton(
-                            iconSize: 30.0,
                             icon: SizedBox(
-                              height: 90,
-                              width: 90,
+                              height: 100,
+                              width: 100,
                               child: Image.asset('assets/images/send_duck.png'),
                             ),
                             onPressed: _saveAndShareMemo,
@@ -1984,8 +1993,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           },
                           child: Column(
                             children: [
-                              if (_mediaPaths.isNotEmpty ||
-                                  _fetchedImages.isNotEmpty)
+                              if (_mediaPaths.isNotEmpty)
                                 SizedBox(
                                   height: screenHeight * 0.25, // 미디어 영역의 높이 고정
                                   child: ListView.builder(
