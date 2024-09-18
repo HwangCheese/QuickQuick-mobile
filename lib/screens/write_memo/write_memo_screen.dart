@@ -1812,11 +1812,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    return PopScope(
-      onPopInvoked: (bool value) async {
-        await _saveMemoToServer();
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      },
+    return WillPopScope(
+      onWillPop: () async => false,
       child: Scaffold(
         resizeToAvoidBottomInset: true, // 키보드에 의해 위젯이 가려지지 않도록 설정
         backgroundColor: Color(0xFFADDCFF), // #ADDCFF
