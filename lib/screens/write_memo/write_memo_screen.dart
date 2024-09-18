@@ -18,6 +18,8 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:html/parser.dart' as htmlParser;
+import 'package:html/dom.dart' as dom;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -138,7 +140,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       String text = _controller.text;
 
-      // Reset the detected URLs
       List<String> urls = [];
 
       // URL 정규 표현식
@@ -159,11 +160,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         _detectedUrls = urls;
       });
 
-      // Existing logic for summary and translation recommendations
       Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
 
       // 요약 추천 로직 (100자 이상 입력 시)
-      if (text.length >= 100 && !_shouldShowSummaryRecommendation) {
+      if ((text.length >= 100 || urls.isNotEmpty) &&
+          !_shouldShowSummaryRecommendation) {
         setState(() {
           _shouldShowSummaryRecommendation = true;
         });
@@ -528,10 +529,23 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Future<void> _getSummary() async {
     final url = 'https://api.openai.com/v1/chat/completions';
 
+    // 감지된 URL에서 내용을 가져와서 함께 요약할 준비
+    String combinedContent = _controller.text;
+
+    for (String detectedUrl in _detectedUrls) {
+      final urlContent = await _fetchUrlContent(detectedUrl);
+      if (urlContent != null) {
+        combinedContent += '\n\nURL 내용:\n' + urlContent;
+      }
+    }
+
     // 메시지 배열을 설정하여 요약 요청
     final messages = [
-      {'role': 'system', 'content': 'summarize result Please write in Korean.'},
-      {'role': 'user', 'content': _controller.text}
+      {
+        'role': 'system',
+        'content': 'Please summarize the following content in Korean.'
+      },
+      {'role': 'user', 'content': combinedContent}
     ];
 
     try {
@@ -551,9 +565,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
       if (response.statusCode == 200) {
         final responseBody = utf8.decode(response.bodyBytes);
-        print('Raw response body: $responseBody'); // 응답 본문 출력
-
         final data = jsonDecode(responseBody);
+        print(data);
         final summary = data['choices'][0]['message']['content'].trim();
         print(summary);
         setState(() {
@@ -913,6 +926,35 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       print('메모 저장 성공');
     } else {
       print('메모 저장 실패: ${response.statusCode}');
+    }
+  }
+
+  Future<String?> _fetchUrlContent(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        // HTML 파싱
+        dom.Document document = htmlParser.parse(response.body);
+
+        // 필요 없는 태그들 제거 (버튼, 링크 등)
+        document
+            .querySelectorAll('a, button, script, style')
+            .forEach((element) {
+          element.remove();
+        });
+
+        // 텍스트만 추출
+        final textContent = document.body?.text ?? '';
+
+        return textContent.trim();
+      } else {
+        print('URL content 불러오기 실패: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('URL content fetch 실패: $e');
+      return null;
     }
   }
 
