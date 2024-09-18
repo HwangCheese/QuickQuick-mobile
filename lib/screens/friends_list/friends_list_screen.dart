@@ -5,10 +5,10 @@ import 'package:sticker_memo/globals.dart';
 
 class FriendsListScreen extends StatefulWidget {
   @override
-  _FriendsListScreenState createState() => _FriendsListScreenState();
+  FriendsListScreenState createState() => FriendsListScreenState();
 }
 
-class _FriendsListScreenState extends State<FriendsListScreen> {
+class FriendsListScreenState extends State<FriendsListScreen> {
   List<Map<String, String>> friends = [];
   List<Map<String, String>> filteredFriends = [];
   final TextEditingController _searchController = TextEditingController();
@@ -359,7 +359,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            _showAddFriendDialog();
+            showAddFriendDialog();
           },
           child: Icon(Icons.add),
           backgroundColor: Color(0xFFCDE9FF), // 버튼 배경 색상
@@ -370,7 +370,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
     );
   }
 
-  void _showAddFriendDialog() {
+  void showAddFriendDialog() {
     final TextEditingController _newFriendController = TextEditingController();
 
     showDialog(
