@@ -777,7 +777,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       return;
     }
 
-    await _showSaveDialog();
+    if (_classification.isNotEmpty) {
+      await _showSaveDialog();
+    } else {
+      await _saveIndividualMemo(
+          _controller.text, _backgroundColor, _mediaPaths, _filePaths);
+    }
   }
 
   Future<void> _showSaveDialog() async {
@@ -947,13 +952,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
-  Future<void> _processEventLine(String line) async {
-    // 개선된 정규식 패턴 (연도 포함, 다양한 구분자 및 시간 형식 허용)
+  void _processEventLine(String line) async {
+    // 여러 개의 일정 구문을 처리하기 위한 정규식
     RegExp pattern = RegExp(
-        r'(?:(\d{4})년\s*)?(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2})|(\d{1,2})시\s*(\d{1,2})분)?\s+(.+)',
-        multiLine: true);
-    Iterable<Match> matches = pattern.allMatches(line);
+      r'(?:(\d{4})[년./-]\s*)?(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2})|(\d{1,2})시\s*(\d{1,2})분)?\s+([^\d]+)',
+      multiLine: true,
+    );
 
+    Iterable<Match> matches = pattern.allMatches(line);
     print('Processing line: "$line"');
     print('Number of matches: ${matches.length}');
 
@@ -979,7 +985,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           minute = int.parse(match.group(7)!);
         }
 
-        String eventDescription = match.group(8)!;
+        String eventDescription = match.group(8)!.trim();
 
         // 유효한 날짜 및 시간인지 확인
         if (!_isValidTime(hour, minute)) {
@@ -987,35 +993,23 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('유효하지 않은 시간 형식입니다: $hour시 $minute분')),
           );
-          continue; // 다음 매치로 건너뜀
+          continue;
         }
 
+        DateTime eventDate = DateTime(year, month, day, hour, minute);
+
+        Map<String, String> eventData = {
+          'user_id': USER_ID,
+          'event_datetime': DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate),
+          'description': eventDescription,
+        };
+
         try {
-          DateTime eventDate = DateTime(
-            year,
-            month,
-            day,
-            hour,
-            minute,
-          );
-
-          // 서버로 보낼 데이터를 JSON으로 변환
-          Map<String, String> eventData = {
-            'user_id': USER_ID,
-            'event_datetime':
-                DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate),
-            'description': eventDescription,
-          };
-
-          // HTTP POST 요청
           var response = await http.post(
             Uri.parse('$SERVER_IP/events'),
             headers: {"Content-Type": "application/json"},
             body: jsonEncode(eventData),
           );
-
-          print('Response status code: ${response.statusCode}');
-          print('Response body: ${response.body}');
 
           if (response.statusCode >= 200 && response.statusCode < 300) {
             print('Event added successfully: ${response.body}');
@@ -1033,7 +1027,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         }
       }
     } else {
-      // 매칭되지 않았을 경우 메시지 표시
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('일정 형식이 올바르지 않습니다.')),
       );
