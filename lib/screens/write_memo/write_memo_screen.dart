@@ -279,7 +279,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     },
     ...
 ]
-모든 내용은 중략 없이 원본 텍스트를 전부 반환해 주세요.
+모든 내용은 중략 없이 원본 텍스트를 무슨 일이 있어도 무조건 전부 반환해 주세요. 절대로 전체 내용을 반환해야 된다는 걸 명심하세요.
 '''
       },
       {'role': 'user', 'content': memoContent},
@@ -777,32 +777,67 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       return;
     }
 
-    // 메모 ID가 없으면 새로 생성
-    widget.initialMemoId ??= _generateRandomId(); // 랜덤 메모 ID 생성
-    String generatedTitle = await generateTitle(_controller.text.isEmpty
-        ? '미디어 메모' // 텍스트가 없을 경우 기본 제목 설정
-        : _controller.text);
-    print('메모 제목: $generatedTitle');
+    await _showSaveDialog();
+  }
+
+  Future<void> _showSaveDialog() async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('메모 저장 방식 선택'),
+          content: Text('메모를 분류해서 저장하시겠습니까?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+                // 분류된 메모 별로 각각 저장
+                for (var classifiedMemo in _classification) {
+                  await _saveClassifiedMemo(classifiedMemo);
+                }
+                Navigator.of(context)
+                    .popUntil((route) => route.isFirst); // 홈으로 돌아가기
+              },
+              child: Text('분류 저장'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+                await _saveIndividualMemo(_controller.text, _backgroundColor,
+                    _mediaPaths, _filePaths); // 전체 저장
+                Navigator.of(context)
+                    .popUntil((route) => route.isFirst); // 홈으로 돌아가기
+              },
+              child: Text('전체 저장'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveClassifiedMemo(Map<String, dynamic> classifiedMemo) async {
+    String memoContent = classifiedMemo['content'];
+    String generatedTitle =
+        await generateTitle(classifiedMemo['title'] ?? '제목 없음');
+
+    String memoId = _generateRandomId();
 
     var url = Uri.parse('$SERVER_IP/memo');
     var request = http.MultipartRequest('POST', url);
 
     // 필수 필드 추가
     request.fields['userId'] = USER_ID;
-    request.fields['theme'] =
-        getColorName(_backgroundColor); // Color를 key로 변환하여 저장
+    request.fields['theme'] = getColorName(_backgroundColor);
     request.fields['posX'] = '100'; // 위치, 크기 예시
     request.fields['posY'] = '100';
     request.fields['width'] = '400';
     request.fields['height'] = '300';
-    request.fields['memo_id'] = widget.initialMemoId!;
+    request.fields['memo_id'] = memoId;
     request.fields['title'] = generatedTitle;
-    request.fields['is_read'] = 1.toString(); // 읽음 안읽음 여부 판단
+    request.fields['is_read'] = 1.toString();
     request.fields['sender_user_id'] = USER_ID;
-
-    // 텍스트가 있는 경우 추가, 없으면 빈 텍스트로 추가
-    request.fields['data_txt'] =
-        _controller.text.isNotEmpty ? _controller.text : "";
+    request.fields['data_txt'] = memoContent.isNotEmpty ? memoContent : "";
 
     // 미디어 파일 추가
     for (var filePath in _mediaPaths) {
@@ -821,19 +856,56 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       request.files.add(await http.MultipartFile.fromPath('files', filePath));
     }
 
-    // 기존 메모가 있으면 삭제
-    if (widget.initialMemoId != null) {
-      await _deleteMemoFromServer(widget.initialMemoId!);
+    var response = await request.send();
+    if (response.statusCode == 201) {
+      print('분류된 메모 저장 성공: $generatedTitle');
+    } else {
+      print('분류된 메모 저장 실패: ${response.statusCode}');
+    }
+  }
+
+  Future<void> _saveIndividualMemo(String content, Color backgroundColor,
+      List<String> mediaPaths, List<String> filePaths) async {
+    widget.initialMemoId ??= _generateRandomId();
+    String generatedTitle =
+        await generateTitle(content.isEmpty ? '미디어 메모' : content);
+
+    var url = Uri.parse('$SERVER_IP/memo');
+    var request = http.MultipartRequest('POST', url);
+
+    // 필수 필드 추가
+    request.fields['userId'] = USER_ID;
+    request.fields['theme'] = getColorName(backgroundColor);
+    request.fields['posX'] = '100';
+    request.fields['posY'] = '100';
+    request.fields['width'] = '400';
+    request.fields['height'] = '300';
+    request.fields['memo_id'] = widget.initialMemoId!;
+    request.fields['title'] = generatedTitle;
+    request.fields['is_read'] = 1.toString();
+    request.fields['sender_user_id'] = USER_ID;
+    request.fields['data_txt'] = content.isNotEmpty ? content : "";
+
+    // 미디어 파일 추가
+    for (var filePath in mediaPaths) {
+      request.files.add(await http.MultipartFile.fromPath('files', filePath));
     }
 
-    // 메모 저장 요청 보내기
+    // 이미지 파일 추가
+    for (var imageData in _fetchedImages) {
+      final imageFile = await _saveImageToFile(imageData);
+      request.files
+          .add(await http.MultipartFile.fromPath('files', imageFile.path));
+    }
+
+    // 기타 파일 추가
+    for (var filePath in filePaths) {
+      request.files.add(await http.MultipartFile.fromPath('files', filePath));
+    }
+
     var response = await request.send();
     if (response.statusCode == 201) {
       print('메모 저장 성공');
-      // 초기 상태를 현재 상태로 업데이트
-      _initialText = _controller.text;
-      _initialBackgroundColor = _backgroundColor;
-      _initialMediaPaths = List.from(_mediaPaths);
     } else {
       print('메모 저장 실패: ${response.statusCode}');
     }
