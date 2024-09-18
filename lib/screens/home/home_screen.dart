@@ -35,7 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int index = 0;
   final TextEditingController _searchController = TextEditingController();
   int isRead = 0;
-  bool _showSender = true;
   Set<String> pinnedMemoIds = Set<String>();
 
   Map<String, Color> colorMap = {
@@ -874,7 +873,7 @@ class _HomeScreenState extends State<HomeScreen> {
               })
           .toList();
 
-      List<String> selectedFriendNames = []; // 선택된 친구 이름을 저장하는 리스트
+      List<String> selectedFriendIds = []; // 선택된 친구의 user_id를 저장하는 리스트
       bool allSelected = false; // 전체 선택 상태를 나타내는 변수
 
       showDialog(
@@ -891,11 +890,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: () {
                         setState(() {
                           if (allSelected) {
-                            selectedFriendNames.clear();
+                            selectedFriendIds.clear(); // 선택 해제
                           } else {
-                            selectedFriendNames = friends
-                                .map((friend) => friend['user_name']!)
-                                .toList();
+                            selectedFriendIds = friends
+                                .map((friend) => friend['user_id']!)
+                                .toList(); // 전체 선택
                           }
                           allSelected = !allSelected;
                         });
@@ -912,15 +911,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       return CheckboxListTile(
                         title: Text(friends[index]['user_name']!),
-                        value: selectedFriendNames
+                        value: selectedFriendIds
                             .contains(friends[index]['user_id']),
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
-                              selectedFriendNames
-                                  .add(friends[index]['user_id']!);
+                              selectedFriendIds.add(friends[index]['user_id']!);
                             } else {
-                              selectedFriendNames
+                              selectedFriendIds
                                   .remove(friends[index]['user_id']);
                             }
                           });
@@ -944,7 +942,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => VideoCallScreen(
-                            selectedFriendIds: selectedFriendNames,
+                            selectedFriendIds: selectedFriendIds,
                           ),
                         ),
                       );
@@ -1136,11 +1134,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: Icon(Icons.more_vert, size: 35.0),
                         onSelected: (int result) {
                           if (result == 0) {
-                            _toggleSelectionMode();
+                            _toggleSelectionMode(); // 선택 모드 토글, 필요 시 상태 변경
                           } else if (result == 1) {
-                            _navigateToCalendar(context);
+                            _navigateToCalendar(context); // 캘린더로 이동
                           } else if (result == 2) {
-                            _navigateToFriendsList(context);
+                            _navigateToFriendsList(context); // 친구 목록으로 이동
                           }
                         },
                         itemBuilder: (BuildContext context) =>
@@ -1278,8 +1276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                           ['is_read'] !=
                                                       1) {
                                                 return Text(
-                                                  currentMemos[index]
-                                                      ['sender_user_id'],
+                                                  currentMemos[index]['title'],
                                                   style: TextStyle(
                                                       fontSize: 16.0,
                                                       fontWeight:
@@ -1410,24 +1407,12 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(30.0),
           ),
           onPressed: () async {
-            final result = await Navigator.push(
+            // WriteMemoScreen으로 이동하고, 돌아올 때 메모 목록을 새로 고침
+            await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => WriteMemoScreen()),
             );
-            print(result);
-            if (result != null &&
-                result['text'] != null &&
-                result['text'].isNotEmpty) {
-              setState(() {
-                result['isPinned'] = false; // 새로운 메모는 기본적으로 고정되지 않음
-                memoTexts[result['memo_id']] = result['text']; // memo_id를 키로 사용
-              });
-              _sortMemos();
-            }
-            memos.insert(0, result as Map<String, dynamic>); // 명시적으로 타입을 캐스팅
-
-            _fetchMemos(); // 서버에서 최신 데이터 불러오기
-            _sortMemos();
+            await _fetchMemos(); // 돌아온 후 메모 목록을 다시 불러옴
           },
           child: Icon(Icons.add),
         ),
