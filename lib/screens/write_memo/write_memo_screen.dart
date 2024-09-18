@@ -890,6 +890,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   Future<void> _saveIndividualMemo(String content, Color backgroundColor,
       List<String> mediaPaths, List<String> filePaths) async {
+    if (widget.initialMemoId != null) {
+      await _deleteMemoFromServer(widget.initialMemoId!);
+    }
+
     widget.initialMemoId ??= _generateRandomId();
     String generatedTitle =
         await generateTitle(content.isEmpty ? '미디어 메모' : content);
@@ -1688,7 +1692,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         OpenFile.open(filePath);
       },
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8.0),
+        margin: EdgeInsets.symmetric(vertical: 4.0),
         padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         decoration: BoxDecoration(
           color: Colors.grey[200],
@@ -1700,7 +1704,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               iconData,
               color: iconColor,
             ),
-            SizedBox(width: 16.0),
+            SizedBox(width: 10.0),
             Expanded(
               child: Text(
                 fileName,
@@ -1708,7 +1712,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(width: 15.0),
             IconButton(
               icon: Icon(Icons.download, color: Colors.grey),
               onPressed: () => _downloadFile(filePath, fileName),
@@ -1795,7 +1798,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
   }
 
-  // 이 함수는 _buildMediaTile에서도 사용됩니다.
   Widget _buildMediaTile(String filePath, int index) {
     final isVideo = filePath.endsWith('.mp4') ||
         filePath.endsWith('.MOV') ||
@@ -1809,7 +1811,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+            padding:
+                const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
             child: AspectRatio(
               aspectRatio: 1.0,
               child: ClipRRect(
