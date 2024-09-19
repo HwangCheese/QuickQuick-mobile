@@ -2,14 +2,12 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:docx_to_text/docx_to_text.dart';
-import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
-import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -164,7 +162,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
 
       // 요약 추천 로직 (100자 이상 입력 시)
-      if ((text.length >= 100 || urls.isNotEmpty || _filePaths.isNotEmpty) &&
+      if ((text.length >= 100 || urls.isNotEmpty) &&
           !_shouldShowSummaryRecommendation) {
         setState(() {
           _shouldShowSummaryRecommendation = true;
@@ -547,18 +545,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           combinedContent += '\n\n' + text;
         }
       } else if (filePath.endsWith('.pdf')) {
-        PDFDoc doc = await PDFDoc.fromPath(filePath);
-        String pdfText = await doc.text;
-        if (pdfText != null) {
-          combinedContent += '\n\n' + pdfText;
-        }
       } else if (filePath.endsWith('.ppt') || filePath.endsWith('.pptx')) {
-        final file = File(filePath);
-        PDFDoc doc = await PDFDoc.fromFile(file);
-        String pptText = await doc.text;
-        if (pptText != null) {
-          combinedContent += '\n\n' + pptText;
-        }
+        // final file = File(filePath);
+        // PDFDoc doc = await PDFDoc.fromFile(file);
+        // String pptText = await doc.text;
+        // if (pptText != null) {
+        //   combinedContent += '\n\n' + pptText;
+        // }
       }
     }
 
@@ -1009,6 +1002,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(); // 다이얼로그 닫기
+                Navigator.of(context)
+                    .popUntil((route) => route.isFirst); // 홈으로 돌아가기
               },
               child: Text('취소'),
             ),
@@ -1739,6 +1734,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       iconColor = Colors.grey;
     }
 
+    if (isDocx || isPdf || isPpt) {
+      _shouldShowSummaryRecommendation = true;
+    }
+
     return GestureDetector(
       onTap: () {
         OpenFile.open(filePath);
@@ -1964,7 +1963,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           'assets/images/translate.png',
                           height: 40,
                         )),
-                  TextButton(onPressed: _classifyMemo, child: Text('분류')),
+                  IconButton(
+                      onPressed: _classifyMemo,
+                      icon: Image.asset(
+                        'assets/images/classify.png',
+                        height: 40,
+                      )),
                 ],
               ),
             ),
