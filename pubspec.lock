@@ -531,14 +531,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_pdf_text:
-    dependency: "direct main"
-    description:
-      name: flutter_pdf_text
-      sha256: "97a49ecba6cf711a607642785758bf74fe0aaa3a2223524fa0c142e3966c56a0"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.6.0"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:
