@@ -973,12 +973,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   bool _isEventLine(String line) {
     RegExp pattern = RegExp(
-        r'(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2}))?\s+(.+)$',
-        multiLine: true);
+      r'(?:(\d{4})년\s*)?' + // 연도
+          r'(?:(\d{1,2})[월./-]\s*)?' + // 월
+          r'(?:(\d{1,2})[일]?)?\s*' + // 일
+          r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분
+          r'(\d{1,2})시(?:\s*(\d{2})분)?)?\s+' + // HH시 MM분 형식
+          r'(.+)$', // 이벤트 설명
+      multiLine: true,
+    );
     return pattern.hasMatch(line);
   }
 
-  // 변경 후
   Future<void> _showMultiEventConfirmationDialog(
       List<String> eventLines) async {
     return showDialog(
@@ -1025,41 +1030,48 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _processEventLine(String line) async {
-    // 여러 개의 일정 구문을 처리하기 위한 정규식
+    // 개선된 정규식 패턴 (연도 포함, 다양한 구분자 허용)
     RegExp pattern = RegExp(
-      r'(?:(\d{4})[년./-]\s*)?(\d{1,2})[월./-]\s*(\d{1,2})[일]?\s*(?:(\d{1,2}):(\d{2})|(\d{1,2})시\s*(\d{1,2})분)?\s+([^\d]+)',
+      r'(?:(\d{4})년\s*)?' + // 연도 (선택적)
+          r'(?:(\d{1,2})[월./-]\s*)?' + // 월 (없을 수 있음)
+          r'(?:(\d{1,2})[일]?)?\s*' + // 일 (있어야 함)
+          r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분 (선택적)
+          r'(\d{1,2})시(?:\s*(\d{2})분)?)?\s+' + // HH시 MM분 형식
+          r'(.+)$', // 이벤트 설명
       multiLine: true,
     );
 
     Iterable<Match> matches = pattern.allMatches(line);
-    print('Processing line: "$line"');
-    print('Number of matches: ${matches.length}');
-
     if (matches.isNotEmpty) {
       for (Match match in matches) {
-        print('Match found: "${match.group(0)}"');
-
         String? yearStr = match.group(1);
         int year = yearStr != null ? int.parse(yearStr) : DateTime.now().year;
-        int month = int.parse(match.group(2)!);
-        int day = int.parse(match.group(3)!);
+
+        String? monthStr = match.group(2);
+        int month =
+            monthStr != null ? int.parse(monthStr) : DateTime.now().month;
+
+        String? dayStr = match.group(3);
+        int day = dayStr != null ? int.parse(dayStr) : DateTime.now().day;
+
+        String? hourStr = match.group(4);
+        String? minuteStr = match.group(5);
+        String? hourKoreanStr = match.group(6);
+        String? minuteKoreanStr = match.group(7);
 
         int hour = 0;
         int minute = 0;
 
-        if (match.group(4) != null && match.group(5) != null) {
-          // "HH:MM" 형식
-          hour = int.parse(match.group(4)!);
-          minute = int.parse(match.group(5)!);
-        } else if (match.group(6) != null && match.group(7) != null) {
-          // "HH시 MM분" 형식
-          hour = int.parse(match.group(6)!);
-          minute = int.parse(match.group(7)!);
+        if (hourStr != null) {
+          hour = int.parse(hourStr);
+          minute = minuteStr != null ? int.parse(minuteStr) : 0;
+        } else if (hourKoreanStr != null) {
+          hour = int.parse(hourKoreanStr);
+          minute = minuteKoreanStr != null ? int.parse(minuteKoreanStr) : 0;
         }
 
         String eventDescription = match.group(8)!.trim();
 
-        // 유효한 날짜 및 시간인지 확인
         if (!_isValidTime(hour, minute)) {
           print('Invalid time format: $hour시 $minute분');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1070,12 +1082,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
         DateTime eventDate = DateTime(year, month, day, hour, minute);
 
+        String eventDateTimeString =
+            DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate);
+
+        // 서버로 보낼 데이터를 JSON으로 변환
         Map<String, String> eventData = {
           'user_id': USER_ID,
-          'event_datetime': DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate),
+          'event_datetime': eventDateTimeString,
           'description': eventDescription,
         };
 
+        // HTTP POST 요청
         try {
           var response = await http.post(
             Uri.parse('$SERVER_IP/events'),
@@ -1083,19 +1100,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
             body: jsonEncode(eventData),
           );
 
-          if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (response.statusCode == 200) {
             print('Event added successfully: ${response.body}');
           } else {
             print('Failed to add event: ${response.statusCode}');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('이벤트 추가 실패: ${response.statusCode}')),
-            );
           }
         } catch (e) {
-          print('Invalid date or error occurred: $e');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('유효하지 않은 날짜 형식 또는 오류 발생: $e')),
-          );
+          print('Error occurred: $e');
         }
       }
     } else {
