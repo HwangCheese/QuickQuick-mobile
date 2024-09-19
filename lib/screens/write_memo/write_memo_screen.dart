@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:docx_to_text/docx_to_text.dart';
 import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+import 'package:flutter_pdf_text/flutter_pdf_text.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -162,7 +164,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
 
       // 요약 추천 로직 (100자 이상 입력 시)
-      if ((text.length >= 100 || urls.isNotEmpty) &&
+      if ((text.length >= 100 || urls.isNotEmpty || _filePaths.isNotEmpty) &&
           !_shouldShowSummaryRecommendation) {
         setState(() {
           _shouldShowSummaryRecommendation = true;
@@ -536,10 +538,34 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     // 감지된 URL에서 내용을 가져와서 함께 요약할 준비
     String combinedContent = _controller.text;
 
+    for (String filePath in _filePaths) {
+      if (filePath.endsWith('.docx')) {
+        final file = File(filePath);
+        final bytes = await file.readAsBytes();
+        final text = docxToText(bytes);
+        if (text != null) {
+          combinedContent += '\n\n' + text;
+        }
+      } else if (filePath.endsWith('.pdf')) {
+        PDFDoc doc = await PDFDoc.fromPath(filePath);
+        String pdfText = await doc.text;
+        if (pdfText != null) {
+          combinedContent += '\n\n' + pdfText;
+        }
+      } else if (filePath.endsWith('.ppt') || filePath.endsWith('.pptx')) {
+        final file = File(filePath);
+        PDFDoc doc = await PDFDoc.fromFile(file);
+        String pptText = await doc.text;
+        if (pptText != null) {
+          combinedContent += '\n\n' + pptText;
+        }
+      }
+    }
+
     for (String detectedUrl in _detectedUrls) {
       final urlContent = await _fetchUrlContent(detectedUrl);
       if (urlContent != null) {
-        combinedContent += '\n\nURL 내용:\n' + urlContent;
+        combinedContent += '\n\n' + urlContent;
       }
     }
 
@@ -1685,6 +1711,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final isPpt = filePath.endsWith('.ppt') || filePath.endsWith('.pptx');
     final isDocx = filePath.endsWith('.docx');
     final isHwp = filePath.endsWith('.hwp'); // 한글 파일 확장자
+    final isZip = filePath.endsWith('.zip'); // 추가된 부분
 
     IconData iconData;
     Color iconColor;
@@ -1704,6 +1731,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     } else if (isHwp) {
       iconData = Icons.description; // 한글 파일 아이콘 (별도의 아이콘이 없으므로 기본 아이콘 사용)
       iconColor = Colors.lightBlue;
+    } else if (isZip) {
+      iconData = Icons.folder_zip; // Zip 파일 아이콘
+      iconColor = Colors.black;
     } else {
       iconData = Icons.insert_drive_file; // 기본 파일 아이콘
       iconColor = Colors.grey;
@@ -2050,7 +2080,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 Expanded(
                                   child: SingleChildScrollView(
                                     controller: _textScrollController, // 추가된 부분
-                                    child: ExtendedTextField(
+                                    child: TextField(
                                       controller: _controller,
                                       maxLines: null,
                                       focusNode: _focusNode,
