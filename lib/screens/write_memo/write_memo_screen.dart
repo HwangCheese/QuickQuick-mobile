@@ -973,10 +973,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
   bool _isEventLine(String line) {
     RegExp pattern = RegExp(
-      r'(?:(\d{4})년\s*)?' + // 연도
-          r'(?:(\d{1,2})[월./-]\s*)?' + // 월
-          r'(?:(\d{1,2})[일]?)?\s*' + // 일
-          r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분
+      r'(?:(\d{4})년\s*)?' + // 연도 (선택적)
+          r'(?:(\d{1,2})[월./-]\s*)?' + // 월 (없을 수 있음)
+          r'(?:(\d{1,2})(?:[일]?)?)' + // 일 (있어야 함)
+          r'(?:\s*[~-]\s*(?:(\d{1,2})[월./-]\s*)?(?:(\d{1,2})[일]?)?)?\s*' + // ~ 또는 -로 구간을 나타내는 패턴
+          r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분 (선택적)
           r'(\d{1,2})시(?:\s*(\d{2})분)?)?\s+' + // HH시 MM분 형식
           r'(.+)$', // 이벤트 설명
       multiLine: true,
@@ -1636,7 +1637,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   // 제목 생성 함수
   Future<String> generateTitle(String text) async {
     if (text.trim().isEmpty) {
-      return "제목 없음"; // 기본 제목 설정
+      if (_filePaths.isNotEmpty) {
+        if (_filePaths.length == 1) {
+          // 파일이 1개일 경우 파일 이름을 제목으로 설정
+          final fileName = _filePaths[0].split('/').last;
+          return "파일: $fileName";
+        } else {
+          // 파일이 여러 개일 경우 파일 개수를 제목으로 설정
+          return "파일 ${_filePaths.length}개가 포함된 메모";
+        }
+      } else {
+        return "제목 없음"; // 기본 제목 설정
+      }
     }
 
     // URL 추출
