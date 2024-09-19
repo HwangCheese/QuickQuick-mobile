@@ -1030,11 +1030,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _processEventLine(String line) async {
-    // 개선된 정규식 패턴 (연도 포함, 다양한 구분자 허용)
+    // 개선된 정규식 패턴 (연속 구간 처리 추가)
     RegExp pattern = RegExp(
       r'(?:(\d{4})년\s*)?' + // 연도 (선택적)
           r'(?:(\d{1,2})[월./-]\s*)?' + // 월 (없을 수 있음)
-          r'(?:(\d{1,2})[일]?)?\s*' + // 일 (있어야 함)
+          r'(?:(\d{1,2})(?:[일]?)?)' + // 일 (있어야 함)
+          r'(?:\s*[~-]\s*(?:(\d{1,2})[월./-]\s*)?(?:(\d{1,2})[일]?)?)?\s*' + // ~ 또는 -로 구간을 나타내는 패턴
           r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분 (선택적)
           r'(\d{1,2})시(?:\s*(\d{2})분)?)?\s+' + // HH시 MM분 형식
           r'(.+)$', // 이벤트 설명
@@ -1054,10 +1055,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         String? dayStr = match.group(3);
         int day = dayStr != null ? int.parse(dayStr) : DateTime.now().day;
 
-        String? hourStr = match.group(4);
-        String? minuteStr = match.group(5);
-        String? hourKoreanStr = match.group(6);
-        String? minuteKoreanStr = match.group(7);
+        // 연속된 일정 구간을 위한 종료일 파싱
+        String? endMonthStr = match.group(4);
+        int endMonth = endMonthStr != null ? int.parse(endMonthStr) : month;
+
+        String? endDayStr = match.group(5);
+        int endDay = endDayStr != null ? int.parse(endDayStr) : day;
+
+        // 시간 파싱
+        String? hourStr = match.group(6);
+        String? minuteStr = match.group(7);
+        String? hourKoreanStr = match.group(8);
+        String? minuteKoreanStr = match.group(9);
 
         int hour = 0;
         int minute = 0;
@@ -1070,7 +1079,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           minute = minuteKoreanStr != null ? int.parse(minuteKoreanStr) : 0;
         }
 
-        String eventDescription = match.group(8)!.trim();
+        String eventDescription = match.group(10)!.trim();
 
         if (!_isValidTime(hour, minute)) {
           print('Invalid time format: $hour시 $minute분');
@@ -1080,33 +1089,47 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           continue;
         }
 
-        DateTime eventDate = DateTime(year, month, day, hour, minute);
+        // 시작일과 종료일을 계산하여 해당 범위의 날짜를 모두 추가
+        DateTime startDate = DateTime(year, month, day, hour, minute);
+        DateTime endDate = DateTime(year, endMonth, endDay, hour, minute);
 
-        String eventDateTimeString =
-            DateFormat('yyyy-MM-dd HH:mm:ss').format(eventDate);
-
-        // 서버로 보낼 데이터를 JSON으로 변환
-        Map<String, String> eventData = {
-          'user_id': USER_ID,
-          'event_datetime': eventDateTimeString,
-          'description': eventDescription,
-        };
-
-        // HTTP POST 요청
-        try {
-          var response = await http.post(
-            Uri.parse('$SERVER_IP/events'),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode(eventData),
+        if (startDate.isAfter(endDate)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('종료일이 시작일보다 빠릅니다.')),
           );
+          continue;
+        }
 
-          if (response.statusCode == 200) {
-            print('Event added successfully: ${response.body}');
-          } else {
-            print('Failed to add event: ${response.statusCode}');
+        for (DateTime currentDate = startDate;
+            currentDate.isBefore(endDate) ||
+                currentDate.isAtSameMomentAs(endDate);
+            currentDate = currentDate.add(Duration(days: 1))) {
+          String eventDateTimeString =
+              DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+
+          // 서버로 보낼 데이터를 JSON으로 변환
+          Map<String, String> eventData = {
+            'user_id': USER_ID,
+            'event_datetime': eventDateTimeString,
+            'description': eventDescription,
+          };
+
+          // HTTP POST 요청
+          try {
+            var response = await http.post(
+              Uri.parse('$SERVER_IP/events'),
+              headers: {"Content-Type": "application/json"},
+              body: jsonEncode(eventData),
+            );
+
+            if (response.statusCode == 200) {
+              print('Event added successfully: ${response.body}');
+            } else {
+              print('Failed to add event: ${response.statusCode}');
+            }
+          } catch (e) {
+            print('Error occurred: $e');
           }
-        } catch (e) {
-          print('Error occurred: $e');
         }
       }
     } else {
