@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../globals.dart';
+import '../../globals.dart';
 import '../write_memo/write_memo_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -24,6 +24,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadEvents();
+      setState(() {
+        _selectedDay = _focusedDay;
+      });
     });
   }
 
