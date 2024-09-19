@@ -17,7 +17,6 @@ class _LoginState extends State<Login> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   QRViewController? qrViewController;
   String? scanResult; // QR 코드에서 읽은 데이터를 저장할 변수
-  bool showLoginButton = false; // 로그인 버튼을 보여줄지 여부를 결정하는 변수
 
   @override
   void initState() {
@@ -62,12 +61,26 @@ class _LoginState extends State<Login> {
           Expanded(
             flex: 1,
             child: Center(
-              child: showLoginButton
-                  ? ElevatedButton(
-                      onPressed: _handleLogin,
-                      child: Text('로그인'),
-                    )
-                  : Text('스캔한 데이터: ${scanResult ?? '없음'}'),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'QR 코드 확인 방법: ',
+                      style: TextStyle(
+                          fontFamily: 'IBMPlexSansKR',
+                          color: Colors.black,
+                          fontSize: 16.0),
+                    ),
+                    TextSpan(
+                      text: '프로필  >  QR 코드',
+                      style: TextStyle(
+                          fontFamily: 'IBMPlexSansKR',
+                          color: Colors.blue,
+                          fontSize: 16.0),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -80,11 +93,19 @@ class _LoginState extends State<Login> {
       qrViewController = controller;
     });
 
-    controller.scannedDataStream.listen((scanData) {
-      setState(() {
-        scanResult = scanData.code;
-        showLoginButton = true; // QR 코드 스캔 후 버튼을 보여줍니다.
-      });
+    controller.scannedDataStream.listen((scanData) async {
+      if (scanResult == null) {
+        // QR 코드가 한 번만 스캔되도록 제한
+        setState(() {
+          scanResult = scanData.code;
+        });
+
+        // QR 코드가 스캔되면 카메라를 일시정지
+        await qrViewController?.pauseCamera();
+
+        // 로그인 처리
+        _handleLogin();
+      }
     });
   }
 
@@ -137,13 +158,12 @@ class _LoginState extends State<Login> {
 
   Future<String?> _fetchUserId(String token) async {
     try {
-      // 쿼리 파라미터로 토큰을 전달하기 위해 Uri를 생성
       final uri = Uri.parse('$SERVER_IP/get-userid').replace(queryParameters: {
         'token': token,
       });
 
       final response = await http.get(
-        uri, // 쿼리 파라미터가 포함된 URI
+        uri,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -154,7 +174,7 @@ class _LoginState extends State<Login> {
         USER_ID = responseData['id'];
         USER_NAME = responseData['name'];
         print('사용자 이름: $USER_NAME');
-        return USER_ID; // 응답에서 사용자 ID를 추출
+        return USER_ID;
       } else {
         print('사용자 ID 요청 실패: ${response.statusCode}');
         print('응답 본문: ${response.body}');
