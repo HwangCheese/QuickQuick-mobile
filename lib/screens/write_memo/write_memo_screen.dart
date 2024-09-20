@@ -25,7 +25,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 import '../../globals.dart';
-import '../calendar/calendar_screen.dart';
 import '../video_call/video_call_screen.dart';
 import 'media_viewer.dart';
 import 'package:intl/intl.dart';
@@ -74,6 +73,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   String _transcription = ''; // 트랜스크립션 결과를 저장할 변수
   bool _shouldShowTranslationRecommendation = false;
   bool _shouldShowVideoCallButton = false;
+  bool _shouldShowClassificationButton = false;
   Timer? _debounce; // 타이머를 관리할 변수 추가
   List<String> _detectedUrls = [];
   List<Map<String, dynamic>> _classification = [];
@@ -188,6 +188,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         });
       }
 
+      // 분류 버튼 표시 로직 (150자 이상 입력 시)
+      if (text.length >= 150 && !_shouldShowClassificationButton) {
+        setState(() {
+          _shouldShowClassificationButton = true;
+        });
+      } else if (text.length < 150 && _shouldShowClassificationButton) {
+        setState(() {
+          _shouldShowClassificationButton = false;
+        });
+      }
+
       if (text.isNotEmpty) {
         // 새로 입력된 텍스트에 대한 언어 감지
         final detectedLanguages = await _detectLanguages(text);
@@ -198,7 +209,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         print('현재 감지된 언어들: $_currentDetectedLanguages'); // 감지된 전체 언어 확인
 
         // 여러 언어가 섞여 있으면 번역 버튼 표시
-        if (detectedLanguages.contains('und')) {
+        if (_currentDetectedLanguages.contains('und')) {
           setState(() {
             _shouldShowTranslationRecommendation = false; // 'und'일 경우 번역 비활성화
           });
@@ -571,13 +582,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           combinedContent += '\n\n' + text;
         }
       } else if (filePath.endsWith('.pdf')) {
+        // PDF 파일 처리 로직 추가 가능
       } else if (filePath.endsWith('.ppt') || filePath.endsWith('.pptx')) {
-        // final file = File(filePath);
-        // PDFDoc doc = await PDFDoc.fromFile(file);
-        // String pptText = await doc.text;
-        // if (pptText != null) {
-        //   combinedContent += '\n\n' + pptText;
-        // }
+        // PowerPoint 파일 처리 로직 추가 가능
       }
     }
 
@@ -588,11 +595,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       }
     }
 
-    // 메시지 배열을 설정하여 요약 요청
+    // 메시지 배열을 설정하여 "- ~" 형태의 목록 요약 요청
     final messages = [
       {
         'role': 'system',
-        'content': 'Please summarize the following content in Korean.'
+        'content':
+            'Summarize the following content in exactly 3 bullet points in Korean. Each bullet point should start with "- " and be concise.'
       },
       {'role': 'user', 'content': combinedContent}
     ];
@@ -608,7 +616,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           'model': 'gpt-3.5-turbo',
           'messages': messages,
           'max_tokens': 500, // 요약 길이 조정
-          'temperature': 0.7, // 생성 다양성 조정
+          'temperature': 0.5, // 더 일관된 답변 생성
         }),
       );
 
@@ -2081,9 +2089,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 children: <Widget>[
                   if (_shouldShowSummaryRecommendation)
                     IconButton(
-                      onPressed: _getSummary,
-                      icon: Icon(Icons.summarize),
-                    ),
+                        onPressed: _getSummary,
+                        icon: Image.asset(
+                          'assets/images/summary.png',
+                          height: 40,
+                        )),
                   if (_shouldShowTranslationRecommendation)
                     IconButton(
                         onPressed: _translate,
@@ -2096,12 +2106,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                       icon: Icon(Icons.video_call),
                       onPressed: _handleTextInputForVideoCall, // 회의 시작 함수 호출
                     ),
-                  IconButton(
+                  if (_shouldShowClassificationButton)
+                    IconButton(
                       onPressed: _classifyMemo,
                       icon: Image.asset(
                         'assets/images/classify.png',
                         height: 40,
-                      )),
+                      ),
+                    ),
                   // 버튼 표시 로직 추가
                 ],
               ),
