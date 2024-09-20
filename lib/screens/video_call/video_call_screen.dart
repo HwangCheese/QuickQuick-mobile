@@ -21,12 +21,12 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
-  InAppWebViewController? _webViewController; // WebViewController를 nullable로 설정
+  InAppWebViewController? _webViewController;
   late IO.Socket _socket;
   String roomId = '';
   late PullToRefreshController pullToRefreshController;
   late ContextMenu contextMenu;
-  late Uri uri;
+  WebUri? uri; // WebUri를 nullable로 설정
   final GlobalKey webViewKey = GlobalKey();
   List<String>? selectedFriendIds;
 
@@ -35,7 +35,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     super.initState();
 
     if (widget.initialUrl != null) {
-      uri = Uri.parse(widget.initialUrl!);
+      uri = WebUri(widget.initialUrl!); // WebUri로 변환
+      print('초기 URL: $uri');
     } else {
       _initializeWebView();
     }
@@ -91,8 +92,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         child: InAppWebView(
           key: webViewKey,
           initialUrlRequest: URLRequest(
-            url: WebUri(
-                'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId'),
+            // WebUri가 null이 아닌 경우 해당 URL, 그렇지 않으면 기본 URL 사용
+            url: uri ??
+                WebUri(
+                    'https://vervet-sacred-needlessly.ngrok-free.app/roomId?roomId=$roomId'),
           ),
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
@@ -100,45 +103,52 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             allowBackgroundAudioPlaying: true,
             allowsInlineMediaPlayback: true,
             useHybridComposition: true,
+            allowsPictureInPictureMediaPlayback: true,
           ),
-          // shouldOverrideUrlLoading: (controller, navigationAction) async {
-          //   var uri = navigationAction.request.url!;
-          //
-          //   if (![
-          //     "http",
-          //     "https",
-          //     "file",
-          //     "chrome",
-          //     "data",
-          //     "javascript",
-          //     "about"
-          //   ].contains(uri.scheme)) {
-          //     if (await canLaunchUrl(uri)) {
-          //       // Launch the App
-          //       await launchUrl(
-          //         uri,
-          //       );
-          //       // and cancel the request
-          //       return NavigationActionPolicy.CANCEL;
-          //     }
-          //   }
-          //
-          //   return NavigationActionPolicy.ALLOW;
-          // },
           onWebViewCreated: (InAppWebViewController controller) {
             setState(() {
               _webViewController = controller;
             });
+
+            _webViewController?.addJavaScriptHandler(
+                handlerName: 'goToHomeScreen',
+                callback: (args) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                });
+          },
+          onJsAlert: (controller, jsAlertRequest) async {
+            print(jsAlertRequest.message);
+            await showDialog(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  title: Text("알림"),
+                  content: Text(jsAlertRequest.message ?? "No message"),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text("OK"),
+                    ),
+                  ],
+                );
+              },
+            );
+            await controller.evaluateJavascript(source: '''
+              var videos = document.querySelectorAll('video');
+              videos.forEach(function(video) {
+                video.play();
+              });
+            ''');
+            return JsAlertResponse(handledByClient: true);
           },
           onPermissionRequest:
               (InAppWebViewController controller, request) async {
             return PermissionResponse(
-                resources: request.resources,
-                action: PermissionResponseAction.GRANT);
-          },
-          onJsAlert: (controller, jsAlertRequest) async {
-            print(jsAlertRequest);
-            return JsAlertResponse(handledByClient: true);
+              resources: request.resources,
+              action: PermissionResponseAction.GRANT,
+            );
           },
           onConsoleMessage: (controller, consoleMessage) {
             print(consoleMessage.message);
