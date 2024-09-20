@@ -1014,6 +1014,47 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     return pattern.hasMatch(line);
   }
 
+  Future<bool> _isDateUsingGPT(String text) async {
+    final url = 'https://api.openai.com/v1/chat/completions';
+
+    final messages = [
+      {
+        'role': 'system',
+        'content': '아래 텍스트가 날짜인지 확인하고, 날짜가 맞으면 "Yes"라고 답변하고, 아니면 "No"라고 답변해주세요.'
+      },
+      {'role': 'user', 'content': text}
+    ];
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $openapiKey', // 여기에 OpenAI API 키를 입력하세요.
+        },
+        body: jsonEncode({
+          'model': 'gpt-3.5-turbo',
+          'messages': messages,
+          'max_tokens': 5,
+          'temperature': 0.0,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseBody = utf8.decode(response.bodyBytes);
+        final data = jsonDecode(responseBody);
+        final answer = data['choices'][0]['message']['content'].trim();
+        return answer.toLowerCase() == 'yes';
+      } else {
+        print('GPT API 호출 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('날짜 판별 중 오류 발생: $e');
+      return false;
+    }
+  }
+
   Future<void> _showMultiEventConfirmationDialog(
       List<String> eventLines) async {
     return showDialog(
@@ -2068,7 +2109,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 List<String> eventLines = [];
 
                 for (String line in lines) {
-                  if (_isEventLine(line.trim())) {
+                  if (await _isDateUsingGPT(line.trim())) {
                     eventLines.add(line.trim());
                   }
                 }
