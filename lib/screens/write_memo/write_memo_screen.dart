@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:docx_to_text/docx_to_text.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -26,6 +26,7 @@ import 'dart:typed_data';
 import 'dart:math';
 import '../../globals.dart';
 import '../calendar/calendar_screen.dart';
+import '../video_call/video_call_screen.dart';
 import 'media_viewer.dart';
 import 'package:intl/intl.dart';
 
@@ -70,9 +71,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   final String _textToProcess = '';
   bool _shouldShowSummaryRecommendation = false;
   final Record _recorder = Record();
-  final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
   String _transcription = ''; // 트랜스크립션 결과를 저장할 변수
   bool _shouldShowTranslationRecommendation = false;
+  bool _shouldShowVideoCallButton = false;
   Timer? _debounce; // 타이머를 관리할 변수 추가
   List<String> _detectedUrls = [];
   List<Map<String, dynamic>> _classification = [];
@@ -140,6 +141,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       String text = _controller.text;
 
       List<String> urls = [];
+      List<String> detectedMeetingTexts = []; // 감지된 화상회의 텍스트 저장 리스트
 
       // URL 정규 표현식
       RegExp urlRegExp = RegExp(
@@ -148,11 +150,24 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         multiLine: true,
       );
 
-      Iterable<RegExpMatch> matches = urlRegExp.allMatches(text);
+      // 화상회의 텍스트 감지 정규식
+      RegExp videoCallPattern =
+          RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화)\s*하기?");
 
-      for (RegExpMatch match in matches) {
+      Iterable<RegExpMatch> urlMatches = urlRegExp.allMatches(text);
+      Iterable<RegExpMatch> videoCallMatches =
+          videoCallPattern.allMatches(text);
+
+      // URL 추출
+      for (RegExpMatch match in urlMatches) {
         String url = match.group(0)!;
         urls.add(url);
+      }
+
+      // 화상회의 텍스트 추출
+      for (RegExpMatch match in videoCallMatches) {
+        String meetingText = match.group(0)!;
+        detectedMeetingTexts.add(meetingText);
       }
 
       setState(() {
@@ -210,6 +225,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
         // 텍스트가 비면 감지된 언어 초기화
         _currentDetectedLanguages.clear();
+      }
+
+      // 화상회의 텍스트가 감지되면 회의 버튼 표시
+      if (detectedMeetingTexts.isNotEmpty) {
+        setState(() {
+          _shouldShowVideoCallButton = true; // 회의 버튼 표시 플래그
+        });
+      } else {
+        setState(() {
+          _shouldShowVideoCallButton = false; // 회의 버튼 숨기기
+        });
       }
     });
   }
@@ -675,17 +701,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           '${directory.path}/converted_${DateTime.now().millisecondsSinceEpoch}.wav';
 
       // FFmpeg 명령어를 사용하여 m4a를 모노 wav로 변환합니다.
-      final arguments = ['-i', m4aFilePath, '-ac', '1', wavFilePath];
+      final arguments = '-i $m4aFilePath -ac 1 $wavFilePath';
 
-      final int result = await _flutterFFmpeg.executeWithArguments(arguments);
+      await FFmpegKit.execute(arguments);
 
-      if (result == 0) {
-        print('Conversion successful');
-        return wavFilePath; // 변환된 wav 파일의 경로를 반환합니다.
-      } else {
-        print('Conversion failed with result $result');
-        throw Exception('Failed to convert m4a to wav');
-      }
+      print('Conversion successful');
+      return wavFilePath; // 변환된 wav 파일의 경로를 반환합니다.
     } catch (e) {
       print('Error occurred: $e');
       throw Exception('Failed to convert m4a to wav');
@@ -1410,6 +1431,69 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     );
   }
 
+  void _handleTextInputForVideoCall() async {
+    String inputText = _controller.text.trim();
+    RegExp videoCallPattern =
+        RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화)\s*하기?");
+
+    Match? match = videoCallPattern.firstMatch(inputText);
+    if (match != null) {
+      String friendName = match.group(1)!;
+
+      // 친구 목록을 서버에서 가져옴
+      final response =
+          await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        List<Map<String, String>> friends = data
+            .map<Map<String, String>>((friend) => {
+                  'user_name': friend['friend_name_set'],
+                  'user_id': friend['friend_id'],
+                })
+            .toList();
+
+        String? friendId;
+        List<String> selectedFriendIds = [];
+        for (var friend in friends) {
+          if (friend['user_name'] == friendName) {
+            friendId = friend['user_id'];
+            selectedFriendIds.add(friendId!);
+            break;
+          }
+        }
+        // VideoCallScreen으로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoCallScreen(
+              selectedFriendIds: selectedFriendIds, // 초대된 친구의 ID 리스트 전달
+            ),
+          ),
+        );
+      } else {
+        _showMessage('친구 목록을 불러오는 데 실패했습니다.');
+      }
+    }
+  }
+
+  Future<void> _sendVideoCallInvite(String friendId) async {
+    final url = Uri.parse('$SERVER_IP/send-video-call-invite');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'sourceUserId': USER_ID,
+        'targetUserId': friendId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('화상회의 초대 링크 전송 성공');
+    } else {
+      print('화상회의 초대 링크 전송 실패: ${response.statusCode}');
+    }
+  }
+
   // 녹음 시작
   Future<void> _startRecording() async {
     Directory appDocDir = await getApplicationDocumentsDirectory();
@@ -1997,11 +2081,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 children: <Widget>[
                   if (_shouldShowSummaryRecommendation)
                     IconButton(
-                        onPressed: _getSummary,
-                        icon: Image.asset(
-                          'assets/images/summary.png',
-                          height: 40,
-                        )),
+                      onPressed: _getSummary,
+                      icon: Icon(Icons.summarize),
+                    ),
                   if (_shouldShowTranslationRecommendation)
                     IconButton(
                         onPressed: _translate,
@@ -2009,12 +2091,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                           'assets/images/translate.png',
                           height: 40,
                         )),
+                  if (_shouldShowVideoCallButton)
+                    IconButton(
+                      icon: Icon(Icons.video_call),
+                      onPressed: _handleTextInputForVideoCall, // 회의 시작 함수 호출
+                    ),
                   IconButton(
                       onPressed: _classifyMemo,
                       icon: Image.asset(
                         'assets/images/classify.png',
                         height: 40,
                       )),
+                  // 버튼 표시 로직 추가
                 ],
               ),
             ),
