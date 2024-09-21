@@ -186,7 +186,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
       // 화상회의 텍스트 감지 정규식
       RegExp videoCallPattern =
-          RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화)\s*하기?");
+          RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화|통화)\s*하기?");
+
+      // 텍스트에서 '위치' 또는 '장소'라는 단어 감지
+      RegExp placePattern = RegExp(r'(.+?)(위치|장소)');
 
       Iterable<RegExpMatch> urlMatches = urlRegExp.allMatches(text);
       Iterable<RegExpMatch> videoCallMatches =
@@ -209,11 +212,16 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       });
 
       _detectedPlaces.clear();
-      placeLinkMap.forEach((place, link) {
-        if (text.contains(place)) {
-          _detectedPlaces.add(place);
-        }
-      });
+
+      Iterable<RegExpMatch> placeMatches = placePattern.allMatches(text);
+      // '위치' 또는 '장소'라는 텍스트가 있을 경우 placeLinkMap과 비교하여 감지
+      if (placeMatches.isNotEmpty) {
+        placeLinkMap.forEach((place, link) {
+          if (text.contains(place)) {
+            _detectedPlaces.add(place); // 해당 장소 감지
+          }
+        });
+      }
 
       setState(() {
         _detectedPlaces = _detectedPlaces;
@@ -1866,7 +1874,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     }
 
     // 텍스트가 15자 이하인 경우, URL 내용을 포함한 전체 텍스트로 제목 생성
-    if (combinedContent.length <= 15) {
+    if (combinedContent.length <= 18) {
       return combinedContent;
     }
 
@@ -2212,7 +2220,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         )),
                   if (_shouldShowVideoCallButton)
                     IconButton(
-                      icon: Icon(Icons.video_call),
+                      icon: Image.asset(
+                        'assets/images/conference.png',
+                        height: 40,
+                      ),
                       onPressed: _handleTextInputForVideoCall, // 회의 시작 함수 호출
                     ),
                   if (_shouldShowClassificationButton)
