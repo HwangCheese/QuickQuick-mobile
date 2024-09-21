@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -103,6 +104,39 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     'ko', // 한국어
   ];
 
+  final Map<String, String> placeLinkMap = {
+    '와글즈비어': 'https://naver.me/GttsdNlu',
+    '와글즈': 'https://naver.me/GttsdNlu',
+    '한성대입구역': 'https://naver.me/FzQmM5e3',
+    '한성대입구': 'https://naver.me/FzQmM5e3',
+    '운봉손칼국수': 'https://naver.me/G0fx9khx',
+    '운봉칼국수': 'https://naver.me/G0fx9khx',
+    '운봉': 'https://naver.me/G0fx9khx',
+    '떡고물': 'https://naver.me/5CzWLvVN',
+    '낙산공원': 'https://naver.me/5MSfUCGw',
+    '낙산': 'https://naver.me/5MSfUCGw',
+    '경복궁': 'https://naver.me/5gdMbWj5',
+    '동대문디자인플라자': 'https://naver.me/5buZE4G4',
+    'DDP': 'https://naver.me/5buZE4G4',
+    '여의도한강공원': 'https://naver.me/Gt1mMK5l',
+    '여의도한강': 'https://naver.me/Gt1mMK5l',
+    '명동': 'https://naver.me/xznVQxGW',
+    '혜화': 'https://naver.me/FLy6FvnJ',
+    '낭만포차': 'https://naver.me/xYQMULY2',
+    '방목': 'https://naver.me/x8likO0m',
+    '방목1호점': 'https://naver.me/x8likO0m',
+    '방목 1호점': 'https://naver.me/x8likO0m',
+    '방목2호점': 'https://naver.me/FOvGSqFr',
+    '방목 2호점': 'https://naver.me/FOvGSqFr',
+    '삼선': 'https://naver.me/F9p5GpfU',
+    '비하인드': 'https://naver.me/xlW11ljk',
+    '옛고을': 'https://naver.me/x9J5RFUT',
+    '레이크웨이브': 'https://naver.me/GvkPLLDG',
+    '레이크 웨이브': 'https://naver.me/GvkPLLDG',
+  };
+
+  List<String> _detectedPlaces = [];
+
   String getColorName(Color color) {
     // colorMap의 value 중 일치하는 Color가 있는지 확인
     String colorKey = colorMap.entries
@@ -172,6 +206,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
       setState(() {
         _detectedUrls = urls;
+      });
+
+      _detectedPlaces.clear();
+      placeLinkMap.forEach((place, link) {
+        if (text.contains(place)) {
+          _detectedPlaces.add(place);
+        }
+      });
+
+      setState(() {
+        _detectedPlaces = _detectedPlaces;
       });
 
       Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
@@ -249,6 +294,22 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         });
       }
     });
+  }
+
+  Future<void> _openMap(String url) async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text('지도 보기'),
+          ),
+          body: InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(url)),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _launchURL(String url) async {
@@ -1020,7 +1081,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     final messages = [
       {
         'role': 'system',
-        'content': '아래 텍스트가 날짜인지 확인하고, 날짜가 맞으면 "Yes"라고 답변하고, 아니면 "No"라고 답변해주세요.'
+        'content': '아래 텍스트가 날짜나 시간인지 확인하고, 맞으면 "Yes"라고 답변하고, 아니면 "No"라고 답변해주세요.'
       },
       {'role': 'user', 'content': text}
     ];
@@ -1044,6 +1105,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         final responseBody = utf8.decode(response.bodyBytes);
         final data = jsonDecode(responseBody);
         final answer = data['choices'][0]['message']['content'].trim();
+        print('answer: $answer');
         return answer.toLowerCase() == 'yes';
       } else {
         print('GPT API 호출 실패: ${response.statusCode}');
@@ -1101,11 +1163,15 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _processEventLine(String line) async {
+    // 메소드 시작 시점에서만 현재 날짜 및 시간을 가져옴
+    DateTime now = DateTime.now(); // 현재 시간을 가져옴
+    print("현재 날짜: ${now.year}-${now.month}-${now.day}"); // 디버깅용 출력
+
     // 개선된 정규식 패턴 (연속 구간 처리 추가)
     RegExp pattern = RegExp(
       r'(?:(\d{4})년\s*)?' + // 연도 (선택적)
           r'(?:(\d{1,2})[월./-]\s*)?' + // 월 (없을 수 있음)
-          r'(?:(\d{1,2})(?:[일]?)?)' + // 일 (있어야 함)
+          r'(?:(\d{1,2})(?:[일]?)?)' + // 일 (없을 수 있음, 없을 경우 오늘 날짜로)
           r'(?:\s*[~-]\s*(?:(\d{1,2})[월./-]\s*)?(?:(\d{1,2})[일]?)?)?\s*' + // ~ 또는 -로 구간을 나타내는 패턴
           r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분 (선택적)
           r'(\d{1,2})시(?:\s*(\d{2})분)?)?\s+' + // HH시 MM분 형식
@@ -1116,15 +1182,17 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     Iterable<Match> matches = pattern.allMatches(line);
     if (matches.isNotEmpty) {
       for (Match match in matches) {
+        // 매칭된 정보를 기반으로 연, 월, 일 계산
         String? yearStr = match.group(1);
-        int year = yearStr != null ? int.parse(yearStr) : DateTime.now().year;
+        int year =
+            yearStr != null ? int.parse(yearStr) : now.year; // 연도가 없으면 올해
 
         String? monthStr = match.group(2);
         int month =
-            monthStr != null ? int.parse(monthStr) : DateTime.now().month;
+            monthStr != null ? int.parse(monthStr) : now.month; // 월이 없으면 이번 달
 
         String? dayStr = match.group(3);
-        int day = dayStr != null ? int.parse(dayStr) : DateTime.now().day;
+        int day = dayStr != null ? int.parse(dayStr) : now.day; // 일이 없으면 오늘
 
         // 연속된 일정 구간을 위한 종료일 파싱
         String? endMonthStr = match.group(4);
@@ -1809,7 +1877,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       {
         'role': 'system',
         'content':
-            '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 15자 이내의 간결한 제목을 생성해 주세요. 쌍따옴표, 따옴표는 넣지 말아주세요. 제목은 한국어로 작성해 주세요.'
+            '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 18자 이내의 간결한 제목을 생성해 주세요. 쌍따옴표, 따옴표는 넣지 말아주세요. 제목은 한국어로 작성해 주세요.'
       },
       {'role': 'user', 'content': combinedContent}
     ];
@@ -1825,7 +1893,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           'model': 'gpt-3.5-turbo',
           'messages': messages,
           'max_tokens': 20, // 제목은 짧으므로 토큰 제한을 낮게 설정
-          'temperature': 0.5, // 생성 다양성 조정
+          'temperature': 0.0, // 생성 다양성 조정
         }),
       );
 
@@ -2155,7 +2223,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                         height: 40,
                       ),
                     ),
-                  // 버튼 표시 로직 추가
                 ],
               ),
             ),
@@ -2304,6 +2371,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                             runSpacing: 8.0,
                             children: _detectedUrls.map((url) {
                               return ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                ),
                                 onPressed: () {
                                   _launchURL(url);
                                 },
@@ -2316,6 +2387,24 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                               );
                             }).toList(),
                           ),
+                        ),
+                      if (_detectedPlaces.isNotEmpty)
+                        Column(
+                          children: _detectedPlaces.map((place) {
+                            return ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                              ),
+                              onPressed: () {
+                                String? url = placeLinkMap[place];
+                                if (url != null) {
+                                  _openMap(url);
+                                }
+                              },
+                              child: Text('$place (지도)'),
+                            );
+                          }).toList(),
                         ),
                       if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
                         SizedBox(height: 20.0),
