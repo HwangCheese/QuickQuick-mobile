@@ -104,6 +104,16 @@ class _HomeScreenState extends State<HomeScreen> {
     print(memoTexts);
   }
 
+  // 파일명에서 순서 정보 추출 함수 (HomeScreen에도 동일하게 추가)
+  int _extractOrderFromFilename(String filename) {
+    RegExp regExp = RegExp(r'_order_(\d+)\.');
+    Match? match = regExp.firstMatch(filename);
+    if (match != null && match.groupCount >= 1) {
+      return int.tryParse(match.group(1)!) ?? 0;
+    }
+    return 0;
+  }
+
   Future<void> _fetchMemoDetails(String memoId, int memoIndex) async {
     final url = Uri.parse('$SERVER_IP/memo/$memoId/data');
     try {
@@ -111,6 +121,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> memoData = json.decode(response.body);
+
+        // 파일명을 기반으로 memoData를 순서대로 정렬
+        memoData.sort((a, b) {
+          String filenameA = a['file_name']; // 서버 응답에서 파일명 필드
+          String filenameB = b['file_name'];
+          int orderA = _extractOrderFromFilename(filenameA);
+          int orderB = _extractOrderFromFilename(filenameB);
+          return orderA.compareTo(orderB);
+        });
+
         List<Map<String, dynamic>> memoItems = [];
 
         for (var item in memoData) {
@@ -121,7 +141,6 @@ class _HomeScreenState extends State<HomeScreen> {
             'content_type': item['content_type'],
           });
 
-          // 텍스트 데이터를 찾으면 가져와서 memoTexts에 저장
           if (item['format'] == 'txt') {
             String dataId = item['data_id'];
             String? textContent = await _getData(dataId);
@@ -133,7 +152,6 @@ class _HomeScreenState extends State<HomeScreen> {
           'data': memoItems,
         };
 
-        // UI 업데이트
         _updateMemos();
       } else {
         print('Failed to load memo datas: ${response.statusCode}');
@@ -152,16 +170,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // originalIndex에 해당하는 데이터가 있는지 확인
           int existingIndex = datas.indexWhere(
-            (data) => data['originalIndex'] == memo['originalIndex'].toString(),
+            (data) =>
+                data['originalIndex'] ==
+                memos.indexWhere((m) => m['memo_id'] == memoId).toString(),
           );
 
           if (existingIndex != -1) {
-            // 기존 데이터를 수정
             datas[existingIndex]['data'] = memoData;
           } else {
-            // 새로운 데이터를 추가
             datas.add({
-              'originalIndex': memo['originalIndex'].toString(),
+              'originalIndex':
+                  memos.indexWhere((m) => m['memo_id'] == memoId).toString(),
               'data': memoData,
             });
           }
@@ -181,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (snapshot.hasData) {
               return Text(
                 title, // 제목을 표시
-                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 15.0, fontWeight: FontWeight.bold),
               );
             } else {
               return Text('데이터를 불러올 수 없습니다.');
@@ -364,6 +383,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _togglePin(index);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.check),
+                title: Text('선택'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _toggleSelectionMode();
                 },
               ),
               ListTile(
@@ -1085,26 +1112,87 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _deleteSelectedMemos,
                 ),
               ],
-              if (!isSelectionMode) ...[
-                IconButton(
-                  icon: Icon(Icons.video_call_outlined),
-                  onPressed: _showFriendSelectionDialogForVideoCall,
+            ],
+          ),
+        ),
+        drawer: Drawer(
+          backgroundColor: Colors.white,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              UserAccountsDrawerHeader(
+                currentAccountPicture: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.person,
+                    size: 40.0,
+                    color: Colors.blue,
+                  ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.logout),
-                  onPressed: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove('token');
-                    await prefs.remove('userId');
-                    await prefs.remove('userName');
+                accountName: Row(
+                  children: [
+                    Text(USER_NAME),
+                    IconButton(
+                      icon: Icon(Icons.copy_outlined,
+                          size: 20, color: Colors.white), // 복사 아이콘 추가
+                      onPressed: () {
+                        Clipboard.setData(
+                            ClipboardData(text: USER_NAME)); // 이름 복사
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          // 복사 완료 알림
+                          SnackBar(content: Text('이름이 복사되었습니다')),
+                        );
+                      },
+                    ),
+                    IconButton(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.remove('token');
+                          await prefs.remove('userId');
+                          await prefs.remove('userName');
 
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => Login()),
-                    );
-                  },
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => Login()),
+                          );
+                        },
+                        icon: Icon(
+                          Icons.logout,
+                          color: Colors.white,
+                        )),
+                  ],
                 ),
-              ],
+                accountEmail: null,
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                ),
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.calendar_month_outlined,
+                ),
+                title: Text('캘린더'),
+                onTap: () {
+                  _navigateToCalendar(context);
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.people,
+                ),
+                title: Text('친구 목록'),
+                onTap: () {
+                  _navigateToFriendsList(context);
+                },
+              ),
+              ListTile(
+                  leading: Icon(
+                    Icons.video_call_outlined,
+                  ),
+                  title: Text('화상 통신'),
+                  onTap: () {
+                    _showFriendSelectionDialogForVideoCall();
+                  }),
             ],
           ),
         ),
@@ -1125,37 +1213,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           'assets/images/img_logo.png',
                           height: 100,
                         ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: PopupMenuButton<int>(
-                        icon: Icon(Icons.more_vert, size: 35.0),
-                        onSelected: (int result) {
-                          if (result == 0) {
-                            _toggleSelectionMode(); // 선택 모드 토글, 필요 시 상태 변경
-                          } else if (result == 1) {
-                            _navigateToCalendar(context); // 캘린더로 이동
-                          } else if (result == 2) {
-                            _navigateToFriendsList(context); // 친구 목록으로 이동
-                          }
-                        },
-                        itemBuilder: (BuildContext context) =>
-                            <PopupMenuEntry<int>>[
-                          const PopupMenuItem<int>(
-                            value: 0,
-                            child: Text('선택'),
-                          ),
-                          const PopupMenuItem<int>(
-                            value: 1,
-                            child: Text('캘린더'),
-                          ),
-                          const PopupMenuItem<int>(
-                            value: 2,
-                            child: Text('친구 목록'),
-                          ),
-                        ],
                       ),
                     ),
                   ],
@@ -1278,9 +1335,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 return Text(
                                                   currentMemos[index]['title'],
                                                   style: TextStyle(
-                                                      fontSize: 16.0,
-                                                      fontWeight:
-                                                          FontWeight.bold),
+                                                    fontSize: 16.0,
+                                                  ),
                                                 );
                                               } else if (dataWidgetSnapshot
                                                   .hasData) {
@@ -1294,8 +1350,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           },
                                         );
                                       } else {
-                                        return Text('',
-                                            style: TextStyle(fontSize: 16.0));
+                                        return Text('');
                                       }
                                     } else {
                                       return Text("");
