@@ -79,6 +79,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   List<String> _detectedUrls = [];
   List<Map<String, dynamic>> _classification = [];
   final ScrollController _textScrollController = ScrollController();
+  Map<String, String> _placeInfoMap = {};
+  List<String> _detectedDateLines = [];
 
   String? _initialText;
   Color? _initialBackgroundColor;
@@ -190,8 +192,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       RegExp videoCallPattern =
           RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화|통화)\s*하기?");
 
-      // 텍스트에서 '위치' 또는 '장소'라는 단어 감지
-      RegExp placePattern = RegExp(r'(.+?)(위치|장소)');
+      RegExp placePattern = RegExp(r'(?:장소|위치)\s*(.+?)$|(.+?)에서');
+      Match? match = placePattern.firstMatch(text);
 
       Iterable<RegExpMatch> urlMatches = urlRegExp.allMatches(text);
       Iterable<RegExpMatch> videoCallMatches =
@@ -215,21 +217,53 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
       _detectedPlaces.clear();
 
-      Iterable<RegExpMatch> placeMatches = placePattern.allMatches(text);
-      // '위치' 또는 '장소'라는 텍스트가 있을 경우 placeLinkMap과 비교하여 감지
-      if (placeMatches.isNotEmpty) {
-        placeLinkMap.forEach((place, link) {
-          if (text.contains(place)) {
-            _detectedPlaces.add(place); // 해당 장소 감지
-          }
-        });
+      if (match != null) {
+        String place = match.group(1)!.trim();
+        // 장소 이름으로 검색 로직 수행
+        _searchPlaceWithKakaoAPI(place);
       }
 
-      setState(() {
-        _detectedPlaces = _detectedPlaces;
-      });
+      // 일정 정보만 저장할 리스트 초기화
+      List<String> detectedDateLines = [];
 
-      Set<String> allDetectedLanguages = {}; // 전체 감지된 언어를 저장할 Set
+      // 텍스트를 줄 단위로 분리
+      List<String> lines = text.split('\n');
+
+      // 일정 정규 표현식
+      RegExp datePattern = RegExp(
+        r'(?:(\d{4})년\s*)?' + // 연도 (선택적)
+            r'(?:(\d{1,2})[월./-]\s*)?' + // 월 (없을 수 있음)
+            r'(?:(\d{1,2})(?:[일]?)?)' + // 일 (있어야 함)
+            r'(?:\s*[~-]\s*(?:(\d{1,2})[월./-]\s*)?(?:(\d{1,2})[일]?)?)?\s*' + // ~ 또는 -로 구간을 나타내는 패턴
+            r'(?:(\d{1,2})(?::(\d{2}))?\s*|' + // 시:분 (선택적)
+            r'(\d{1,2})시(?:\s*(\d{2})분)?)?\s+', // HH시 MM분 형식
+        multiLine: true,
+      );
+
+      DateTime now = DateTime.now();
+      for (String line in lines) {
+        if (line.trim().isNotEmpty) {
+          // 일정 정보 추출
+          Match? match = datePattern.firstMatch(line.trim());
+          if (match != null) {
+            // 날짜, 시간, 이벤트 내용 추출
+            String? yearStr = match.group(1) ?? '';
+            String? monthStr = match.group(2) ?? now.month.toString();
+            String? dayStr = match.group(3) ?? now.day.toString();
+            String? hourStr = match.group(6) ?? match.group(8) ?? '00';
+            String? minuteStr = match.group(7) ?? match.group(9) ?? '00';
+
+            String eventDate = '$yearStr $monthStr $dayStr $hourStr:$minuteStr';
+
+            detectedDateLines.add(eventDate.trim());
+          }
+        }
+      }
+
+      // 일정 정보를 감지한 후 상태를 업데이트
+      setState(() {
+        _detectedDateLines = detectedDateLines;
+      });
 
       // 요약 추천 로직 (100자 이상 입력 시)
       if ((text.length >= 100 || urls.isNotEmpty) &&
@@ -306,6 +340,40 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     });
   }
 
+  Future<void> _searchPlaceWithKakaoAPI(String placeName) async {
+    final url =
+        'https://dapi.kakao.com/v2/local/search/keyword.json?query=${Uri.encodeComponent(placeName)}';
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'KakaoAK $kakaoApiKey',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['documents'] != null && data['documents'].length > 0) {
+        final item = data['documents'][0];
+        final mapUrl =
+            'https://map.kakao.com/link/map/${item['place_name']},${item['y']},${item['x']}';
+
+        _showPlaceButton(placeName, mapUrl);
+      } else {
+        print('장소를 찾을 수 없습니다.');
+      }
+    } else {
+      print('카카오 API 호출 실패: ${response.statusCode}');
+    }
+  }
+
+  void _showPlaceButton(String placeName, String placeInfo) {
+    setState(() {
+      _detectedPlaces.add(placeName);
+      _placeInfoMap[placeName] = placeInfo; // 장소와 정보를 매핑
+    });
+  }
+
   Future<void> _openMap(String url) async {
     Navigator.push(
       context,
@@ -362,10 +430,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
           }
         }
       }
-      print('감지된 언어: $detectedLanguages');
+
       if (detectedLanguages.contains('und')) {
         detectedLanguages.remove('und');
       }
+      print('감지된 언어: $detectedLanguages');
       return detectedLanguages;
     } catch (e) {
       print('오류 발생: $e');
@@ -1119,6 +1188,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         final data = jsonDecode(responseBody);
         final answer = data['choices'][0]['message']['content'].trim();
         print('answer: $answer');
+        if (answer == 'no') return false;
         return answer.toLowerCase() == 'yes';
       } else {
         print('GPT API 호출 실패: ${response.statusCode}');
@@ -2185,21 +2255,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
               color: Colors.black,
               onPressed: () async {
                 await _saveMemoToServer();
-                String currentText = _controller.text;
-                List<String> lines = currentText.split('\n'); // 텍스트를 줄 단위로 나눔
-                List<String> eventLines = [];
-
-                for (String line in lines) {
-                  if (await _isDateUsingGPT(line.trim())) {
-                    eventLines.add(line.trim());
-                  }
-                }
-
-                if (eventLines.isNotEmpty) {
-                  _showMultiEventConfirmationDialog(eventLines);
-                } else {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                // if (eventLines.isNotEmpty) {
+                //   _showMultiEventConfirmationDialog(eventLines);
+                // } else {
+                //
+                // }
               },
             ),
           ),
@@ -2413,12 +2474,12 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                 foregroundColor: Colors.black,
                               ),
                               onPressed: () {
-                                String? url = placeLinkMap[place];
+                                String? url = _placeInfoMap[place];
                                 if (url != null) {
                                   _openMap(url);
                                 }
                               },
-                              child: Text('$place (지도)'),
+                              child: Text('$place'),
                             );
                           }).toList(),
                         ),
@@ -2517,6 +2578,18 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                   fontSize: 16.0, color: Colors.black),
                             ),
                           ),
+                        ),
+                      if (_detectedDateLines.isNotEmpty)
+                        Column(
+                          children: _detectedDateLines.map((line) {
+                            return ElevatedButton(
+                              onPressed: () {
+                                _processEventLine(line);
+                                _detectedDateLines.remove(line);
+                              },
+                              child: Text('$line'),
+                            );
+                          }).toList(),
                         ),
                       if (_classification.isNotEmpty) SizedBox(height: 20.0),
                       if (_classification.isNotEmpty)
