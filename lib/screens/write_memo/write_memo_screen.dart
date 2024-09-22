@@ -105,8 +105,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   ];
 
   final Map<String, String> placeLinkMap = {
-    '와글즈비어': 'https://naver.me/GttsdNlu',
-    '와글즈': 'https://naver.me/GttsdNlu',
+    '와글즈비어':
+        'https://m.map.kakao.com/actions/detailMapView?id=22115771&refService=place',
+    '와글즈':
+        'https://m.map.kakao.com/actions/detailMapView?id=22115771&refService=place',
     '한성대입구역': 'https://naver.me/FzQmM5e3',
     '한성대입구': 'https://naver.me/FzQmM5e3',
     '운봉손칼국수': 'https://naver.me/G0fx9khx',
@@ -361,10 +363,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         }
       }
       print('감지된 언어: $detectedLanguages');
+      if (detectedLanguages.contains('und')) {
+        detectedLanguages.remove('und');
+      }
       return detectedLanguages;
     } catch (e) {
       print('오류 발생: $e');
-      return {'und'}; // 감지되지 않음
+      return {};
     }
   }
 
