@@ -106,39 +106,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     'ko', // 한국어
   ];
 
-  final Map<String, String> placeLinkMap = {
-    '와글즈비어':
-        'https://m.map.kakao.com/actions/detailMapView?id=22115771&refService=place',
-    '와글즈':
-        'https://m.map.kakao.com/actions/detailMapView?id=22115771&refService=place',
-    '한성대입구역': 'https://naver.me/FzQmM5e3',
-    '한성대입구': 'https://naver.me/FzQmM5e3',
-    '운봉손칼국수': 'https://naver.me/G0fx9khx',
-    '운봉칼국수': 'https://naver.me/G0fx9khx',
-    '운봉': 'https://naver.me/G0fx9khx',
-    '떡고물': 'https://naver.me/5CzWLvVN',
-    '낙산공원': 'https://naver.me/5MSfUCGw',
-    '낙산': 'https://naver.me/5MSfUCGw',
-    '경복궁': 'https://naver.me/5gdMbWj5',
-    '동대문디자인플라자': 'https://naver.me/5buZE4G4',
-    'DDP': 'https://naver.me/5buZE4G4',
-    '여의도한강공원': 'https://naver.me/Gt1mMK5l',
-    '여의도한강': 'https://naver.me/Gt1mMK5l',
-    '명동': 'https://naver.me/xznVQxGW',
-    '혜화': 'https://naver.me/FLy6FvnJ',
-    '낭만포차': 'https://naver.me/xYQMULY2',
-    '방목': 'https://naver.me/x8likO0m',
-    '방목1호점': 'https://naver.me/x8likO0m',
-    '방목 1호점': 'https://naver.me/x8likO0m',
-    '방목2호점': 'https://naver.me/FOvGSqFr',
-    '방목 2호점': 'https://naver.me/FOvGSqFr',
-    '삼선': 'https://naver.me/F9p5GpfU',
-    '비하인드': 'https://naver.me/xlW11ljk',
-    '옛고을': 'https://naver.me/x9J5RFUT',
-    '레이크웨이브': 'https://naver.me/GvkPLLDG',
-    '레이크 웨이브': 'https://naver.me/GvkPLLDG',
-  };
-
   List<String> _detectedPlaces = [];
 
   String getColorName(Color color) {
