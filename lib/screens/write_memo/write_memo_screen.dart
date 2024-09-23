@@ -112,7 +112,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
     // colorMap의 value 중 일치하는 Color가 있는지 확인
     String colorKey = colorMap.entries
         .firstWhere((entry) => entry.value == color,
-            orElse: () => MapEntry('white', Colors.white))
+        orElse: () => MapEntry('white', Colors.white))
         .key;
     return colorKey;
   }
@@ -157,14 +157,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
       // 화상회의 텍스트 감지 정규식
       RegExp videoCallPattern =
-          RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화|통화)\s*하기?");
+      RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화|통화)\s*");
 
-      RegExp placePattern = RegExp(r'(?:장소|위치)\s*(.+?)$|(.+?)에서');
+      RegExp placePattern = RegExp(r'(.+?)에서');
       Match? match = placePattern.firstMatch(text);
 
       Iterable<RegExpMatch> urlMatches = urlRegExp.allMatches(text);
       Iterable<RegExpMatch> videoCallMatches =
-          videoCallPattern.allMatches(text);
+      videoCallPattern.allMatches(text);
 
       // URL 추출
       for (RegExpMatch match in urlMatches) {
@@ -308,9 +308,8 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _searchPlaceWithKakaoAPI(String placeName) async {
-    final url =
-        'https://dapi.kakao.com/v2/local/search/keyword.json?query=${Uri.encodeComponent(placeName)}';
-
+    final url = 'https://dapi.kakao.com/v2/local/search/keyword.json?query=${Uri.encodeComponent(placeName)}';
+    print(placeName);
     final response = await http.get(
       Uri.parse(url),
       headers: {
@@ -322,8 +321,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       final data = jsonDecode(response.body);
       if (data['documents'] != null && data['documents'].length > 0) {
         final item = data['documents'][0];
-        final mapUrl =
-            'https://map.kakao.com/link/map/${item['place_name']},${item['y']},${item['x']}';
+        final mapUrl = 'https://map.kakao.com/link/map/${item['place_name']},${item['y']},${item['x']}';
 
         _showPlaceButton(placeName, mapUrl);
       } else {
@@ -398,7 +396,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         }
       }
 
-      if (detectedLanguages.contains('und')) {
+      if(detectedLanguages.contains('und')) {
         detectedLanguages.remove('und');
       }
       print('감지된 언어: $detectedLanguages');
@@ -710,7 +708,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       {
         'role': 'system',
         'content':
-            'Summarize the following content in exactly 3 bullet points in Korean. Each bullet point should start with "- " and be concise.'
+        'Summarize the following content in exactly 3 bullet points in Korean. Each bullet point should start with "- " and be concise.'
       },
       {'role': 'user', 'content': combinedContent}
     ];
@@ -999,7 +997,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   Future<void> _saveClassifiedMemo(Map<String, dynamic> classifiedMemo) async {
     String memoContent = classifiedMemo['content'];
     String generatedTitle =
-        await generateTitle(classifiedMemo['title'] ?? '제목 없음');
+    await generateTitle(classifiedMemo['title'] ?? '제목 없음');
 
     String memoId = _generateRandomId();
 
@@ -1045,7 +1043,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     widget.initialMemoId ??= _generateRandomId();
     String generatedTitle =
-        await generateTitle(content.isEmpty ? '미디어 메모' : content);
+    await generateTitle(content.isEmpty ? '미디어 메모' : content);
 
     var url = Uri.parse('$SERVER_IP/memo');
     var request = http.MultipartRequest('POST', url);
@@ -1155,7 +1153,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         final data = jsonDecode(responseBody);
         final answer = data['choices'][0]['message']['content'].trim();
         print('answer: $answer');
-        if (answer == 'no') return false;
+        if(answer == 'no') return false;
         return answer.toLowerCase() == 'yes';
       } else {
         print('GPT API 호출 실패: ${response.statusCode}');
@@ -1235,11 +1233,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         // 매칭된 정보를 기반으로 연, 월, 일 계산
         String? yearStr = match.group(1);
         int year =
-            yearStr != null ? int.parse(yearStr) : now.year; // 연도가 없으면 올해
+        yearStr != null ? int.parse(yearStr) : now.year; // 연도가 없으면 올해
 
         String? monthStr = match.group(2);
         int month =
-            monthStr != null ? int.parse(monthStr) : now.month; // 월이 없으면 이번 달
+        monthStr != null ? int.parse(monthStr) : now.month; // 월이 없으면 이번 달
 
         String? dayStr = match.group(3);
         int day = dayStr != null ? int.parse(dayStr) : now.day; // 일이 없으면 오늘
@@ -1290,11 +1288,11 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         }
 
         for (DateTime currentDate = startDate;
-            currentDate.isBefore(endDate) ||
-                currentDate.isAtSameMomentAs(endDate);
-            currentDate = currentDate.add(Duration(days: 1))) {
+        currentDate.isBefore(endDate) ||
+            currentDate.isAtSameMomentAs(endDate);
+        currentDate = currentDate.add(Duration(days: 1))) {
           String eventDateTimeString =
-              DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(currentDate);
 
           // 서버로 보낼 데이터를 JSON으로 변환
           Map<String, String> eventData = {
@@ -1574,7 +1572,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         return AlertDialog(
           title: const Text('일정을 추가할까요?'),
           content:
-              Text('날짜: ${DateFormat('yyyy-MM-dd').format(date)}\n내용: $text'),
+          Text('날짜: ${DateFormat('yyyy-MM-dd').format(date)}\n내용: $text'),
           actions: [
             TextButton(
               onPressed: () {
@@ -1601,7 +1599,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   void _handleTextInputForVideoCall() async {
     String inputText = _controller.text.trim();
     RegExp videoCallPattern =
-        RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화)\s*하기?");
+    RegExp(r"(.+?)(랑|와|과)\s*(화상회의|회의|얘기|이야기|대화)\s*하기?");
 
     Match? match = videoCallPattern.firstMatch(inputText);
     if (match != null) {
@@ -1609,14 +1607,14 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
       // 친구 목록을 서버에서 가져옴
       final response =
-          await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
+      await http.get(Uri.parse('$SERVER_IP/friends/$USER_NAME'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         List<Map<String, String>> friends = data
             .map<Map<String, String>>((friend) => {
-                  'user_name': friend['friend_name_set'],
-                  'user_id': friend['friend_id'],
-                })
+          'user_name': friend['friend_name_set'],
+          'user_id': friend['friend_id'],
+        })
             .toList();
 
         String? friendId;
@@ -1768,9 +1766,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       final List<dynamic> data = json.decode(response.body);
       List<Map<String, String>> friends = data
           .map<Map<String, String>>((friend) => {
-                'user_name': friend['friend_name_set'],
-                'user_id': friend['friend_id'],
-              })
+        'user_name': friend['friend_name_set'],
+        'user_id': friend['friend_id'],
+      })
           .toList();
 
       List<String> selectedFriendIds = []; // 선택된 친구 ID를 저장하는 리스트
@@ -1927,7 +1925,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       {
         'role': 'system',
         'content':
-            '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 18자 이내의 간결한 제목을 생성해 주세요. 쌍따옴표, 따옴표는 넣지 말아주세요. 제목은 한국어로 작성해 주세요.'
+        '아래의 내용과 포함된 URL의 내용을 참고하여, 최대 18자 이내의 간결한 제목을 생성해 주세요. 쌍따옴표, 따옴표는 넣지 말아주세요. 제목은 한국어로 작성해 주세요.'
       },
       {'role': 'user', 'content': combinedContent}
     ];
@@ -2160,7 +2158,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         children: [
           Padding(
             padding:
-                const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+            const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
             child: AspectRatio(
               aspectRatio: 1.0,
               child: ClipRRect(
@@ -2175,13 +2173,13 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   ),
                   child: isVideo
                       ? _videoControllers[index] != null &&
-                              _videoControllers[index]!.value.isInitialized
-                          ? VideoPlayer(_videoControllers[index]!)
-                          : Center(child: CircularProgressIndicator())
+                      _videoControllers[index]!.value.isInitialized
+                      ? VideoPlayer(_videoControllers[index]!)
+                      : Center(child: CircularProgressIndicator())
                       : isAudio
-                          ? Icon(Icons.audiotrack,
-                              size: 50, color: Colors.black)
-                          : Image.file(File(filePath), fit: BoxFit.cover),
+                      ? Icon(Icons.audiotrack,
+                      size: 50, color: Colors.black)
+                      : Image.file(File(filePath), fit: BoxFit.cover),
                 ),
               ),
             ),
@@ -2275,397 +2273,397 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
         body: _isLoading
             ? Center(child: CircularProgressIndicator()) // 로딩 중일 때는 로딩 인디케이터 표시
             : GestureDetector(
-                onTap: () {
-                  FocusScope.of(context).unfocus(); // 키보드 내리기
-                },
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      SizedBox(
-                        height: 30.0,
+          onTap: () {
+            FocusScope.of(context).unfocus(); // 키보드 내리기
+          },
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                SizedBox(
+                  height: 30.0,
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: SizedBox(
+                        height: 100,
+                        width: 100,
+                        child:
+                        Image.asset('assets/images/insert_file.png'),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: SizedBox(
-                              height: 100,
-                              width: 100,
-                              child:
-                                  Image.asset('assets/images/insert_file.png'),
-                            ),
-                            onPressed: _pickImageOrFile,
-                          ),
-                          IconButton(
-                            icon: SizedBox(
-                              height: 100,
-                              width: 100,
-                              child: _isRecording
-                                  ? Icon(Icons.stop,
-                                      color: Colors.red, size: 30)
-                                  : Image.asset(
-                                      'assets/images/record_duck.png'),
-                            ),
-                            onPressed:
-                                _isRecording ? _stopRecording : _startRecording,
-                          ),
-                          IconButton(
-                            icon: SizedBox(
-                              height: 100,
-                              width: 100,
-                              child: Image.asset('assets/images/send_duck.png'),
-                            ),
-                            onPressed: _saveAndShareMemo,
-                          ),
-                        ],
+                      onPressed: _pickImageOrFile,
+                    ),
+                    IconButton(
+                      icon: SizedBox(
+                        height: 100,
+                        width: 100,
+                        child: _isRecording
+                            ? Icon(Icons.stop,
+                            color: Colors.red, size: 30)
+                            : Image.asset(
+                            'assets/images/record_duck.png'),
                       ),
-                      SizedBox(height: 30.0),
-                      Container(
-                        width: screenWidth * 0.9,
-                        height: screenHeight * 0.5,
-                        decoration: BoxDecoration(
-                          color: _backgroundColor,
-                          borderRadius: BorderRadius.circular(16.0),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 8.0,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: GestureDetector(
-                          onTap: () {
-                            FocusScope.of(context)
-                                .requestFocus(_focusNode); // 텍스트 필드에 포커스를 줌
-                          },
-                          child: Column(
-                            children: [
-                              if (_mediaPaths.isNotEmpty)
-                                SizedBox(
-                                  height: screenHeight * 0.25, // 미디어 영역의 높이 고정
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: _mediaPaths.length,
-                                    itemBuilder: (context, index) {
-                                      return _buildMediaTile(
-                                          _mediaPaths[index], index);
-                                    },
-                                  ),
-                                ),
-                              if (_filePaths.isNotEmpty)
-                                Expanded(
-                                  child: ListView.builder(
-                                    padding: EdgeInsets.all(8.0),
-                                    itemCount: _filePaths.length,
-                                    itemBuilder: (context, index) {
-                                      return _buildFileTile(_filePaths[index],
-                                          index + _mediaPaths.length, index);
-                                    },
-                                  ),
-                                ),
-                              if (_isMediaSelected && _imageData != null)
-                                Container(
-                                  padding:
-                                      EdgeInsets.symmetric(horizontal: 16.0),
-                                  constraints: BoxConstraints(
-                                    maxWidth: screenWidth * 0.9,
-                                    maxHeight: screenHeight * 0.4,
-                                  ),
-                                  child: Image.memory(
-                                    _imageData!,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                              if (!_isMediaSelected || _imageData == null)
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    controller: _textScrollController, // 추가된 부분
-                                    child: TextField(
-                                      controller: _controller,
-                                      maxLines: null,
-                                      focusNode: _focusNode,
-                                      onChanged: (text) {
-                                        _handleTextChanged(); // 텍스트가 변경될 때마다 요약 추천 체크
-                                      },
-                                      decoration: InputDecoration(
-                                        border: InputBorder.none,
-                                        hintText: '메모를 입력하세요...',
-                                        contentPadding: EdgeInsets.only(
-                                            left: 16.0), // 왼쪽 여백 추가
-                                      ),
-                                      style: TextStyle(
-                                        fontSize: 16.0,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                      onPressed:
+                      _isRecording ? _stopRecording : _startRecording,
+                    ),
+                    IconButton(
+                      icon: SizedBox(
+                        height: 100,
+                        width: 100,
+                        child: Image.asset('assets/images/send_duck.png'),
                       ),
-                      if (_detectedUrls.isNotEmpty)
-                        Container(
-                          width: screenWidth * 0.9,
-                          padding: EdgeInsets.symmetric(vertical: 10.0),
-                          child: Wrap(
-                            spacing: 8.0,
-                            runSpacing: 8.0,
-                            children: _detectedUrls.map((url) {
-                              return ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: Colors.black,
-                                ),
-                                onPressed: () {
-                                  _launchURL(url);
-                                },
-                                child: Text(
-                                  url.length > 30
-                                      ? '${url.substring(0, 30)}...'
-                                      : url,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      if (_detectedPlaces.isNotEmpty)
-                        Column(
-                          children: _detectedPlaces.map((place) {
-                            return ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
-                              ),
-                              onPressed: () {
-                                String? url = _placeInfoMap[place];
-                                if (url != null) {
-                                  _openMap(url);
-                                }
-                              },
-                              child: Text('$place'),
-                            );
-                          }).toList(),
-                        ),
-                      if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
-                        SizedBox(height: 20.0),
-                      if (_summary.isNotEmpty)
-                        GestureDetector(
-                          onDoubleTap: () {
-                            Clipboard.setData(ClipboardData(text: _summary));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Summary 텍스트가 복사되었습니다!')),
-                            );
-                          },
-                          child: Container(
-                            width: screenWidth * 0.9,
-                            padding: EdgeInsets.all(16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 8.0,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              _summary,
-                              style: TextStyle(
-                                  fontSize: 16.0, color: Colors.black),
-                            ),
-                          ),
-                        ),
-                      if (_transcription.isNotEmpty) // 트랜스크립션 내용이 있을 때만 표시
-                        SizedBox(height: 20.0),
-                      if (_transcription.isNotEmpty)
-                        GestureDetector(
-                          onDoubleTap: () {
-                            Clipboard.setData(
-                                ClipboardData(text: _transcription));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text('Transcription 텍스트가 복사되었습니다!')),
-                            );
-                          },
-                          child: Container(
-                            width: screenWidth * 0.9,
-                            padding: EdgeInsets.all(16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 8.0,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              _transcription,
-                              style: TextStyle(
-                                  fontSize: 16.0, color: Colors.black),
-                            ),
-                          ),
-                        ),
-                      if (_translatedText.isNotEmpty) SizedBox(height: 20.0),
-                      if (_translatedText.isNotEmpty)
-                        GestureDetector(
-                          onDoubleTap: () {
-                            Clipboard.setData(
-                                ClipboardData(text: _translatedText));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text('Translated 텍스트가 복사되었습니다!')),
-                            );
-                          },
-                          child: Container(
-                            width: screenWidth * 0.9,
-                            padding: EdgeInsets.all(16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16.0),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 8.0,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              _translatedText,
-                              style: TextStyle(
-                                  fontSize: 16.0, color: Colors.black),
-                            ),
-                          ),
-                        ),
-                      if (_detectedDateLines.isNotEmpty)
-                        Column(
-                          children: _detectedDateLines.map((line) {
-                            return ElevatedButton(
-                              onPressed: () {
-                                _processEventLine(line);
-                                _detectedDateLines.remove(line);
-                              },
-                              child: Text('$line'),
-                            );
-                          }).toList(),
-                        ),
-                      if (_classification.isNotEmpty) SizedBox(height: 20.0),
-                      if (_classification.isNotEmpty)
-                        Column(
-                          children: _classification.map((item) {
-                            return GestureDetector(
-                              onDoubleTap: () {
-                                Clipboard.setData(ClipboardData(
-                                    text:
-                                        '${item['title']}: ${item['content']}'));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content:
-                                          Text('Classification 텍스트가 복사되었습니다!')),
-                                );
-                              },
-                              child: Container(
-                                width: screenWidth * 0.9,
-                                padding: EdgeInsets.all(16.0),
-                                margin: EdgeInsets.symmetric(vertical: 8.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16.0),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 8.0,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item['title'],
-                                      style: TextStyle(
-                                        fontSize: 16.0,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    SizedBox(height: 8.0),
-                                    Text(
-                                      item['content'],
-                                      style: TextStyle(
-                                        fontSize: 14.0,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      SizedBox(height: 10.0),
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Container(
-                          color: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: Container(
-                            width: MediaQuery.of(context).size.width,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: colorMap.entries.map((entry) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _backgroundColor = entry.value;
-                                      });
-                                    },
-                                    child: Container(
-                                      margin:
-                                          EdgeInsets.symmetric(horizontal: 10),
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: entry.value,
-                                        borderRadius:
-                                            BorderRadius.circular(20.0),
-                                        border: Border.all(
-                                          color: _backgroundColor == entry.value
-                                              ? Colors.black
-                                              : Colors.transparent,
-                                          width: 2.0,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: _backgroundColor == entry.value
-                                            ? Icon(Icons.check,
-                                                color: Colors.black)
-                                            : SizedBox.shrink(),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ),
+                      onPressed: _saveAndShareMemo,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 30.0),
+                Container(
+                  width: screenWidth * 0.9,
+                  height: screenHeight * 0.5,
+                  decoration: BoxDecoration(
+                    color: _backgroundColor,
+                    borderRadius: BorderRadius.circular(16.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8.0,
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
+                  child: GestureDetector(
+                    onTap: () {
+                      FocusScope.of(context)
+                          .requestFocus(_focusNode); // 텍스트 필드에 포커스를 줌
+                    },
+                    child: Column(
+                      children: [
+                        if (_mediaPaths.isNotEmpty)
+                          SizedBox(
+                            height: screenHeight * 0.25, // 미디어 영역의 높이 고정
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _mediaPaths.length,
+                              itemBuilder: (context, index) {
+                                return _buildMediaTile(
+                                    _mediaPaths[index], index);
+                              },
+                            ),
+                          ),
+                        if (_filePaths.isNotEmpty)
+                          Expanded(
+                            child: ListView.builder(
+                              padding: EdgeInsets.all(8.0),
+                              itemCount: _filePaths.length,
+                              itemBuilder: (context, index) {
+                                return _buildFileTile(_filePaths[index],
+                                    index + _mediaPaths.length, index);
+                              },
+                            ),
+                          ),
+                        if (_isMediaSelected && _imageData != null)
+                          Container(
+                            padding:
+                            EdgeInsets.symmetric(horizontal: 16.0),
+                            constraints: BoxConstraints(
+                              maxWidth: screenWidth * 0.9,
+                              maxHeight: screenHeight * 0.4,
+                            ),
+                            child: Image.memory(
+                              _imageData!,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        if (!_isMediaSelected || _imageData == null)
+                          Expanded(
+                            child: SingleChildScrollView(
+                              controller: _textScrollController, // 추가된 부분
+                              child: TextField(
+                                controller: _controller,
+                                maxLines: null,
+                                focusNode: _focusNode,
+                                onChanged: (text) {
+                                  _handleTextChanged(); // 텍스트가 변경될 때마다 요약 추천 체크
+                                },
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: '메모를 입력하세요...',
+                                  contentPadding: EdgeInsets.only(
+                                      left: 16.0), // 왼쪽 여백 추가
+                                ),
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                if (_detectedUrls.isNotEmpty)
+                  Container(
+                    width: screenWidth * 0.9,
+                    padding: EdgeInsets.symmetric(vertical: 10.0),
+                    child: Wrap(
+                      spacing: 8.0,
+                      runSpacing: 8.0,
+                      children: _detectedUrls.map((url) {
+                        return ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: () {
+                            _launchURL(url);
+                          },
+                          child: Text(
+                            url.length > 30
+                                ? '${url.substring(0, 30)}...'
+                                : url,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                if (_detectedPlaces.isNotEmpty)
+                  Column(
+                    children: _detectedPlaces.map((place) {
+                      return ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: () {
+                          String? url = _placeInfoMap[place];
+                          if (url != null) {
+                            _openMap(url);
+                          }
+                        },
+                        child: Text('지도 : $place'),
+                      );
+                    }).toList(),
+                  ),
+                if (_summary.isNotEmpty) // _summary 내용이 있을 때만 표시
+                  SizedBox(height: 20.0),
+                if (_summary.isNotEmpty)
+                  GestureDetector(
+                    onDoubleTap: () {
+                      Clipboard.setData(ClipboardData(text: _summary));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Summary 텍스트가 복사되었습니다!')),
+                      );
+                    },
+                    child: Container(
+                      width: screenWidth * 0.9,
+                      padding: EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8.0,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _summary,
+                        style: TextStyle(
+                            fontSize: 16.0, color: Colors.black),
+                      ),
+                    ),
+                  ),
+                if (_transcription.isNotEmpty) // 트랜스크립션 내용이 있을 때만 표시
+                  SizedBox(height: 20.0),
+                if (_transcription.isNotEmpty)
+                  GestureDetector(
+                    onDoubleTap: () {
+                      Clipboard.setData(
+                          ClipboardData(text: _transcription));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('Transcription 텍스트가 복사되었습니다!')),
+                      );
+                    },
+                    child: Container(
+                      width: screenWidth * 0.9,
+                      padding: EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8.0,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _transcription,
+                        style: TextStyle(
+                            fontSize: 16.0, color: Colors.black),
+                      ),
+                    ),
+                  ),
+                if (_translatedText.isNotEmpty) SizedBox(height: 20.0),
+                if (_translatedText.isNotEmpty)
+                  GestureDetector(
+                    onDoubleTap: () {
+                      Clipboard.setData(
+                          ClipboardData(text: _translatedText));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('Translated 텍스트가 복사되었습니다!')),
+                      );
+                    },
+                    child: Container(
+                      width: screenWidth * 0.9,
+                      padding: EdgeInsets.all(16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8.0,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _translatedText,
+                        style: TextStyle(
+                            fontSize: 16.0, color: Colors.black),
+                      ),
+                    ),
+                  ),
+                if (_detectedDateLines.isNotEmpty)
+                  Column(
+                    children: _detectedDateLines.map((line) {
+                      return ElevatedButton(
+                        onPressed: () {
+                          _processEventLine(line);
+                          _detectedDateLines.remove(line);
+                        },
+                        child: Text('$line'),
+                      );
+                    }).toList(),
+                  ),
+                if (_classification.isNotEmpty) SizedBox(height: 20.0),
+                if (_classification.isNotEmpty)
+                  Column(
+                    children: _classification.map((item) {
+                      return GestureDetector(
+                        onDoubleTap: () {
+                          Clipboard.setData(ClipboardData(
+                              text:
+                              '${item['title']}: ${item['content']}'));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                Text('Classification 텍스트가 복사되었습니다!')),
+                          );
+                        },
+                        child: Container(
+                          width: screenWidth * 0.9,
+                          padding: EdgeInsets.all(16.0),
+                          margin: EdgeInsets.symmetric(vertical: 8.0),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8.0,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['title'],
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              SizedBox(height: 8.0),
+                              Text(
+                                item['content'],
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                SizedBox(height: 10.0),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    color: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Container(
+                      width: MediaQuery.of(context).size.width,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: colorMap.entries.map((entry) {
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _backgroundColor = entry.value;
+                                });
+                              },
+                              child: Container(
+                                margin:
+                                EdgeInsets.symmetric(horizontal: 10),
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: entry.value,
+                                  borderRadius:
+                                  BorderRadius.circular(20.0),
+                                  border: Border.all(
+                                    color: _backgroundColor == entry.value
+                                        ? Colors.black
+                                        : Colors.transparent,
+                                    width: 2.0,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: _backgroundColor == entry.value
+                                      ? Icon(Icons.check,
+                                      color: Colors.black)
+                                      : SizedBox.shrink(),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
