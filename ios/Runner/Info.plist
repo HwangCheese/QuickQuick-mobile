@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sticker Memo</string>
+	<string>Quick Quick</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,10 +24,28 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>sms</string>
+		<string>tel</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSAllowsArbitraryLoadsForMedia</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsForMedia</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>이 앱은 사진을 찍기 위해 카메라를 사용합니다.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
@@ -76,35 +94,17 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSAppTransportSecurity</key>
-    <dict>
-          <key>NSAllowsArbitraryLoads</key>
-          <true/>
-          <key>NSAllowsArbitraryLoadsInWebContent</key>
-          <true/>
-          <key>NSAllowsArbitraryLoadsForMedia</key>
-          <true/>
-          <key>NSAllowsLocalNetworking</key>
-          <true/>
-    </dict>
-    <key>WKAppBoundDomains</key>
-        <array>
-            <string>https://glorious-urchin-preferably.ngrok-free.app</string>
-            <string>https://vervet-sacred-needlessly.ngrok-free.app</string>
-        </array>
-        <key>WKWebViewConfiguration</key>
-        <dict>
-            <key>AllowsInlineMediaPlayback</key>
-            <true/>
-            <key>MediaPlaybackRequiresUserAction</key>
-            <false/>
-        </dict>
-    <key>NSAllowsArbitraryLoadsForMedia</key>
-    <true/>
-    <key>LSApplicationQueriesSchemes</key>
-    <array>
-      <string>sms</string>
-      <string>tel</string>
-    </array>
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>https://glorious-urchin-preferably.ngrok-free.app</string>
+		<string>https://vervet-sacred-needlessly.ngrok-free.app</string>
+	</array>
+	<key>WKWebViewConfiguration</key>
+	<dict>
+		<key>AllowsInlineMediaPlayback</key>
+		<true/>
+		<key>MediaPlaybackRequiresUserAction</key>
+		<false/>
+	</dict>
 </dict>
 </plist>
