@@ -8,7 +8,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
@@ -340,19 +339,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
   }
 
   Future<void> _openMap(String url) async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text('지도 보기'),
-          ),
-          body: InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(url)),
-          ),
-        ),
-      ),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (context) => Scaffold(
+    //       appBar: AppBar(
+    //         title: Text('지도 보기'),
+    //       ),
+    //       body: InAppWebView(
+    //         initialUrlRequest: URLRequest(url: WebUri(url)),
+    //       ),
+    //     ),
+    //   ),
+    // );
   }
 
   Future<void> _launchURL(String url) async {
@@ -1006,7 +1005,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
 
     // 필수 필드 추가
     request.fields['userId'] = USER_ID;
-    request.fields['theme'] = getColorName(_backgroundColor);
     request.fields['posX'] = '100'; // 위치, 크기 예시
     request.fields['posY'] = '100';
     request.fields['width'] = '400';
@@ -2211,9 +2209,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
       onWillPop: () async => false,
       child: Scaffold(
         resizeToAvoidBottomInset: true, // 키보드에 의해 위젯이 가려지지 않도록 설정
-        backgroundColor: Color(0xFFADDCFF), // #ADDCFF
+        backgroundColor: Color(0xFFFAFAFA),
         appBar: AppBar(
-          backgroundColor: Color(0xFFADDCFF),
+          backgroundColor: Color(0xFFFAFAFA),
           leading: Padding(
             padding: const EdgeInsets.only(left: 16.0),
             child: BackButton(
@@ -2323,7 +2321,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   width: screenWidth * 0.9,
                   height: screenHeight * 0.5,
                   decoration: BoxDecoration(
-                    color: _backgroundColor,
+                    color: Color(0xFFFAFAFA),
                     borderRadius: BorderRadius.circular(16.0),
                     boxShadow: [
                       BoxShadow(
@@ -2614,51 +2612,6 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                 SizedBox(height: 10.0),
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: Container(
-                    color: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 10),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: colorMap.entries.map((entry) {
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _backgroundColor = entry.value;
-                                });
-                              },
-                              child: Container(
-                                margin:
-                                EdgeInsets.symmetric(horizontal: 10),
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: entry.value,
-                                  borderRadius:
-                                  BorderRadius.circular(20.0),
-                                  border: Border.all(
-                                    color: _backgroundColor == entry.value
-                                        ? Colors.black
-                                        : Colors.transparent,
-                                    width: 2.0,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: _backgroundColor == entry.value
-                                      ? Icon(Icons.check,
-                                      color: Colors.black)
-                                      : SizedBox.shrink(),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
