@@ -543,8 +543,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 titleCentered: true,
                 leftChevronVisible: true,
                 rightChevronVisible: true,
+                leftChevronIcon: Icon(
+                  Icons.chevron_left,
+                  size: 50,// 왼쪽 버튼 아이콘
+                  color: Color(0xFFE48758), // 왼쪽 버튼 색상 변경
+                ),
+                rightChevronIcon: Icon(
+                  Icons.chevron_right,
+                  size: 50,// 오른쪽 버튼 아이콘
+                  color: Color(0xFFE48758), // 오른쪽 버튼 색상 변경
+                ),
                 titleTextStyle: TextStyle(
-                    fontSize: 30.0,
+                    fontSize: 40.0,
                     color: Color(0xFFE48758),
                     fontWeight: FontWeight.bold,
                 ),
@@ -670,7 +680,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 cellMargin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 30.0), // 날짜 셀의 상하 여백
               ),
             ),
-            const SizedBox(height: 50),
+            SizedBox(height: 50),
+            Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start, // 왼쪽 정렬
+                  children: [
+                    Text(
+                      DateFormat('MM월 dd일').format(_focusedDay), // 월/일 포맷
+                      style: const TextStyle(
+                        color: Color(0xFFE48758),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 30,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
             Expanded(
               child: ListView.builder(
                 itemCount: events.length,
@@ -694,7 +721,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             style: const TextStyle(
                               color: Color(0xFFE48758),
                               fontWeight: FontWeight.bold,
-                              fontSize: 30
+                              fontSize: 25
                             ),
                           ),
                           const SizedBox(width: 40),

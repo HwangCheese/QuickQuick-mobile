@@ -74,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // 고정 상태를 기존에 저장된 pinnedMemoIds와 비교하여 설정
             bool isPinned = pinnedMemoIds.contains(memoId);
             return {
-              'color': colorMap[item['theme']] ?? Colors.white,
+              'color': Color(0xFFF4EEE7),
               'isPinned': isPinned, // 고정 상태 설정
               'memo_id': memoId,
               'timestamp': DateTime.parse(item['date']),
@@ -1116,25 +1116,32 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         drawer: Drawer(
-          backgroundColor: Colors.white,
+          backgroundColor: Color(0xFFF4EEE7),
           child: ListView(
             padding: EdgeInsets.zero,
             children: <Widget>[
               UserAccountsDrawerHeader(
                 currentAccountPicture: CircleAvatar(
-                  backgroundColor: Colors.white,
+                  backgroundColor: Color(0xFFF4EEE7),
                   child: Icon(
                     Icons.person,
                     size: 40.0,
-                    color: Colors.blue,
+                    color: Color(0xFFE48758),
                   ),
                 ),
                 accountName: Row(
                   children: [
-                    Text(USER_NAME),
+                    Text(
+                        USER_NAME,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22.0,
+                          color: Color(0xFFF4EEE7),
+                        ),
+                    ),
                     IconButton(
                       icon: Icon(Icons.copy_outlined,
-                          size: 20, color: Colors.white), // 복사 아이콘 추가
+                          size: 25, color: Color(0xFFF4EEE7)), // 복사 아이콘 추가
                       onPressed: () {
                         Clipboard.setData(
                             ClipboardData(text: USER_NAME)); // 이름 복사
@@ -1144,6 +1151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
+                    SizedBox(width: 68,),
                     IconButton(
                         onPressed: () async {
                           final prefs = await SharedPreferences.getInstance();
@@ -1158,20 +1166,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                         icon: Icon(
                           Icons.logout,
-                          color: Colors.white,
+                          size: 25,
+                          color: Color(0xFFF4EEE7),
                         )),
                   ],
                 ),
                 accountEmail: null,
                 decoration: BoxDecoration(
-                  color: Colors.blue,
+                  color: Color(0xFFE48758),
                 ),
               ),
               ListTile(
                 leading: Icon(
                   Icons.calendar_month_outlined,
+                  color: Color(0xFFE48758),
                 ),
-                title: Text('캘린더'),
+                title: Text(
+                    '캘린더',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF939495),
+                  ),
+                ),
                 onTap: () {
                   _navigateToCalendar(context);
                 },
@@ -1179,8 +1195,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ListTile(
                 leading: Icon(
                   Icons.people,
+                  color: Color(0xFFE48758),
                 ),
-                title: Text('친구 목록'),
+                title: Text(
+                    '친구 목록',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFE48758),
+                  ),
+                ),
                 onTap: () {
                   _navigateToFriendsList(context);
                 },
@@ -1188,15 +1211,26 @@ class _HomeScreenState extends State<HomeScreen> {
               ListTile(
                   leading: Icon(
                     Icons.video_call_outlined,
+                    color: Color(0xFFE48758),
                   ),
-                  title: Text('화상 통신'),
+                  title: Text(
+                      '화상 통신',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE48758),
+                    ),
+                  ),
                   onTap: () {
                     _showFriendSelectionDialogForVideoCall();
-                  }),
+                  }
+              ),
             ],
           ),
         ),
+        backgroundColor: Color(0xFFF4EEE7),
         body: RefreshIndicator(
+          backgroundColor: Color(0xFFFAFAFA),
+          color: Color(0xFFE48758),
           onRefresh: _fetchMemos, // 새로고침 시 호출될 함수
           child: Padding(
             padding: const EdgeInsets.only(
@@ -1227,22 +1261,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.0),
                       borderSide: BorderSide(
-                        color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                        width: 3.0, // 테두리 굵기
+                        color: Color(0xFFE48758), // 기본 상태 테두리 색상
+                        width: 2.0, // 테두리 굵기
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.0),
                       borderSide: BorderSide(
-                        color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                        width: 3.0, // 테두리 굵기
+                        color: Color(0xFFE48758), // 기본 상태 테두리 색상
+                        width: 2.0, // 테두리 굵기
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.0),
                       borderSide: BorderSide(
-                        color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
-                        width: 3.0, // 테두리 굵기
+                        color: Color(0xFFE48758), // 포커스 상태 테두리 색상
+                        width: 2.0, // 테두리 굵기
                       ),
                     ),
                     suffixIcon:
@@ -1426,7 +1460,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   height: 24,
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? Colors.blue[400]
+                                        ? Color(0xFFE48758)
                                         : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
@@ -1455,21 +1489,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: Colors.blue[100],
-          foregroundColor: Colors.blue[900],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30.0),
+        floatingActionButton: SizedBox(
+          width: 100.0, // 원하는 너비
+          height: 100.0, // 원하는 높이
+          child: FloatingActionButton(
+            backgroundColor: Color(0xFFFAFAFA),
+            foregroundColor: Color(0xFFE48758),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30.0),
+            ),
+            onPressed: () async {
+              // WriteMemoScreen으로 이동하고, 돌아올 때 메모 목록을 새로 고침
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => WriteMemoScreen()),
+              );
+              await _fetchMemos(); // 돌아온 후 메모 목록을 다시 불러옴
+            },
+            child: Icon(Icons.add, size: 30.0), // 아이콘 크기 조정
           ),
-          onPressed: () async {
-            // WriteMemoScreen으로 이동하고, 돌아올 때 메모 목록을 새로 고침
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => WriteMemoScreen()),
-            );
-            await _fetchMemos(); // 돌아온 후 메모 목록을 다시 불러옴
-          },
-          child: Icon(Icons.add),
         ),
       ),
     );
