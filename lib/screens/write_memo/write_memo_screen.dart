@@ -2250,7 +2250,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   if (_shouldShowVideoCallButton)
                     IconButton(
                       icon: Image.asset(
-                        'assets/images/conference.png',
+                        'assets/images/video_call.png',
                         height: 40,
                       ),
                       onPressed: _handleTextInputForVideoCall, // 회의 시작 함수 호출
@@ -2286,31 +2286,33 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                   children: [
                     IconButton(
                       icon: SizedBox(
-                        height: 100,
-                        width: 100,
+                        height: 50,
+                        width: 50,
                         child:
                         Image.asset('assets/images/insert_file.png'),
                       ),
                       onPressed: _pickImageOrFile,
                     ),
+                    SizedBox(width: 50,),
                     IconButton(
                       icon: SizedBox(
-                        height: 100,
-                        width: 100,
+                        height: 50,
+                        width: 50,
                         child: _isRecording
                             ? Icon(Icons.stop,
-                            color: Colors.red, size: 30)
+                            color: Color(0xFFE48758), size: 50)
                             : Image.asset(
-                            'assets/images/record_duck.png'),
+                            'assets/images/record.png'),
                       ),
                       onPressed:
                       _isRecording ? _stopRecording : _startRecording,
                     ),
+                    SizedBox(width: 50,),
                     IconButton(
                       icon: SizedBox(
-                        height: 100,
-                        width: 100,
-                        child: Image.asset('assets/images/send_duck.png'),
+                        height: 50,
+                        width: 50,
+                        child: Image.asset('assets/images/send.png'),
                       ),
                       onPressed: _saveAndShareMemo,
                     ),
