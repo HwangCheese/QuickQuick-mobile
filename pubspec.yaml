@@ -62,9 +62,9 @@ flutter:
   uses-material-design: true
 
   fonts:
-    - family: IBMPlexSansKR
+    - family: KakaoOTFRegular
       fonts:
-        - asset: assets/fonts/IBMPlexSansKR-Light.ttf
+        - asset: assets/fonts/KakaoOTFRegular.otf
 
   assets:
     - assets/images/

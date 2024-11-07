@@ -43,7 +43,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sticker Memo',
       theme: ThemeData(
-          fontFamily: 'IBMPlexSansKR', scaffoldBackgroundColor: Colors.white),
+          fontFamily: 'KakaoOTFRegular', scaffoldBackgroundColor: Colors.white),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
