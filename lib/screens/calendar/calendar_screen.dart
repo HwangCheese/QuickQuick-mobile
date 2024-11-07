@@ -399,20 +399,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return AlertDialog(
           title: Text('일정 옵션'),
           content: Text('일정을 수정하거나 삭제하시겠습니까?\n$eventDescription'),
+          backgroundColor: Color(0xFFF4EEE7),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _showEditEventDialog(date, eventDescription);
               },
-              child: Text('수정'),
+              child: Text(
+                  '수정',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE48758),
+                ),
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _deleteEvent(date, eventDescription);
               },
-              child: Text('삭제'),
+              child: Text(
+                  '삭제',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE48758),
+                ),
+              ),
             ),
           ],
         );
@@ -506,7 +519,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final events = _getEventsForDay(_selectedDay ?? _focusedDay);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('캘린더'),
@@ -516,10 +528,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             onPressed: _showAddEventDialog, // "+" 버튼 클릭 시 다이얼로그 열기
           ),
         ],
+        backgroundColor: Color(0xFFF4EEE7),
       ),
+      backgroundColor: Color(0xFFF4EEE7),
       body: Padding(
         padding: const EdgeInsets.only(
-            top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
+            top: 100.0, left: 16.0, right: 16.0, bottom: 16.0),
         child: Column(
           children: <Widget>[
             TableCalendar(
@@ -529,12 +543,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 titleCentered: true,
                 leftChevronVisible: true,
                 rightChevronVisible: true,
-                titleTextStyle: const TextStyle(fontSize: 23.0),
+                titleTextStyle: TextStyle(
+                    fontSize: 30.0,
+                    color: Color(0xFFE48758),
+                    fontWeight: FontWeight.bold,
+                ),
                 headerMargin: const EdgeInsets.only(bottom: 30.0),
               ),
               firstDay: DateTime.utc(2010, 10, 16),
               lastDay: DateTime.utc(2030, 3, 14),
               focusedDay: _focusedDay,
+              daysOfWeekHeight: 60,
               selectedDayPredicate: (day) {
                 return isSameDay(_selectedDay, day);
               },
@@ -549,6 +568,52 @@ class _CalendarScreenState extends State<CalendarScreen> {
               },
               eventLoader: _getEventsForDay,
               calendarBuilders: CalendarBuilders(
+                dowBuilder: (context, day) {
+                  final text = DateFormat.E('ko_KR').format(day);
+
+                  // 일요일과 토요일의 색상 변경
+                  Color textColor;
+                  if (day.weekday == DateTime.sunday) {
+                    textColor = Colors.red;
+                  } else if (day.weekday == DateTime.saturday) {
+                    textColor = Colors.blue;
+                  } else {
+                    textColor = Colors.black;
+                  }
+
+                  return Center(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  );
+                },
+                defaultBuilder: (context, day, focusedDay) {
+                  // 일요일과 토요일의 날짜 색상 변경
+                  Color textColor;
+                  if (day.weekday == DateTime.sunday) {
+                    textColor = Colors.red;
+                  } else if (day.weekday == DateTime.saturday) {
+                    textColor = Colors.blue;
+                  } else {
+                    textColor = Colors.black;
+                  }
+
+                  return Center(
+                    child: Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  );
+                },
                 markerBuilder: (context, date, events) {
                   if (events.isNotEmpty) {
                     return Positioned(
@@ -558,7 +623,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         height: 7,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.blue,
+                          color: Color(0xFFE48758),
                         ),
                       ),
                     );
@@ -566,25 +631,46 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   return null;
                 },
               ),
-              calendarStyle: CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: Colors.transparent,
-                  shape: BoxShape.circle,
-                  border:
-                      Border.all(color: const Color(0xFFBBDEFB), width: 1.5),
-                ),
-                todayTextStyle: const TextStyle(
+              daysOfWeekStyle: DaysOfWeekStyle(
+                weekdayStyle: TextStyle(
+                  fontSize: 16.0, // 요일 폰트 크기
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
                 ),
+                weekendStyle: TextStyle(
+                  fontSize: 16.0, // 주말 요일 폰트 크기
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              calendarStyle: CalendarStyle(
+                defaultTextStyle: TextStyle(
+                  fontSize: 16.0, // 일반 날짜 폰트 크기
+                  color: Colors.black,
+                ),
+                todayDecoration: BoxDecoration(
+                  color: Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Color(0xFFE48758), width: 1.5),
+                ),
+                todayTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16.0, // 오늘 날짜 폰트 크기
+                  color: Colors.black,
+                ),
                 selectedDecoration: BoxDecoration(
-                  color: Colors.blue[300],
+                  color: Color(0xFFE48758),
                   shape: BoxShape.circle,
                 ),
-                cellMargin: const EdgeInsets.symmetric(vertical: 4.0),
+                selectedTextStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16.0, // 선택된 날짜 폰트 크기
+                  color: Colors.white,
+                ),
+                cellMargin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 30.0), // 날짜 셀의 상하 여백
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 50),
             Expanded(
               child: ListView.builder(
                 itemCount: events.length,
@@ -606,13 +692,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           Text(
                             time,
                             style: const TextStyle(
-                              color: Colors.blue,
+                              color: Color(0xFFE48758),
                               fontWeight: FontWeight.bold,
+                              fontSize: 30
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 40),
                           Expanded(
-                            child: Text(description),
+                            child: Text(
+                                description,
+                              style: TextStyle(
+                                fontSize: 15,
+                              ),
+                            ),
                           ),
                         ],
                       ),
