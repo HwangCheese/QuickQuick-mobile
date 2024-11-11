@@ -46,7 +46,9 @@ class _LoginState extends State<Login> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Color(0xFFFAFAFA), // 여기에 배경색 추가
       appBar: AppBar(
+        backgroundColor: Color(0xFFFAFAFA),
         title: Text('QR을 스캔하여 퀵퀵이 서비스를 이용하세요'),
       ),
       body: Column(
@@ -75,7 +77,7 @@ class _LoginState extends State<Login> {
                       text: '프로필  >  QR 코드',
                       style: TextStyle(
                           fontFamily: 'IBMPlexSansKR',
-                          color: Colors.blue,
+                          color: Color(0xFFE48758),
                           fontSize: 16.0),
                     ),
                   ],
