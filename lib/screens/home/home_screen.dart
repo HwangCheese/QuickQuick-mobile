@@ -357,7 +357,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _reindexMemoTexts() {}
-
   // void _reindexMemoTexts() {
   //   // 기존 memoTexts의 인덱스를 1씩 증가시킴
   //   Map<int, String> updatedMemoTexts = {};
@@ -379,7 +378,12 @@ class _HomeScreenState extends State<HomeScreen> {
             children: <Widget>[
               ListTile(
                 leading: Icon(Icons.push_pin),
-                title: Text(memos[index]['isPinned'] ? '상단 고정 해제' : '상단 고정'),
+                title: Text(
+                  memos[index]['isPinned'] ? '상단 고정 해제' : '상단 고정',
+                  style: TextStyle(
+                    color: Color(0xFFE48758), // 텍스트 색상 설정
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _togglePin(index);
@@ -387,7 +391,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               ListTile(
                 leading: Icon(Icons.check),
-                title: Text('선택'),
+                title: Text(
+                  '선택',
+                  style: TextStyle(color: Color(0xFFE48758)),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _toggleSelectionMode();
@@ -395,7 +402,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               ListTile(
                 leading: Icon(Icons.share),
-                title: Text('공유'),
+                title: Text(
+                  '공유',
+                  style: TextStyle(color: Color(0xFFE48758)),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _showFriendSelectionDialog(memoId); // memoId 전달
@@ -403,7 +413,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               ListTile(
                 leading: Icon(Icons.delete),
-                title: Text('삭제'),
+                title: Text(
+                  '삭제',
+                  style: TextStyle(color: Color(0xFFE48758)),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   setState(() {
@@ -462,10 +475,14 @@ class _HomeScreenState extends State<HomeScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
+                backgroundColor: Color(0xFFFAFAFA),
                 title: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('친구 선택'),
+                    Text(
+                      '친구 선택',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                     ElevatedButton(
                       onPressed: () {
                         setState(() {
@@ -512,7 +529,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () {
                       Navigator.of(context).pop(); // 팝업 닫기
                     },
-                    child: Text('취소'),
+                    child: Text(
+                      '취소',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                   ),
                   TextButton(
                     onPressed: () {
@@ -520,7 +540,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       _shareMemoWithFriends(
                           selectedFriendIds, memoId); // memoId 전달
                     },
-                    child: Text('전송'),
+                    child: Text(
+                      '전송',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                   ),
                 ],
               );
@@ -559,10 +582,14 @@ class _HomeScreenState extends State<HomeScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
+                backgroundColor: Color(0xFFFAFAFA),
                 title: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('친구 선택'),
+                    Text(
+                      '친구 선택',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                     ElevatedButton(
                       onPressed: () {
                         setState(() {
@@ -609,7 +636,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () {
                       Navigator.of(context).pop(); // 팝업 닫기
                     },
-                    child: Text('취소'),
+                    child: Text(
+                      '취소',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                   ),
                   TextButton(
                     onPressed: () {
@@ -617,7 +647,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       _shareSelectedMemosWithFriends(
                           selectedFriendIds); // 선택된 메모들을 공유
                     },
-                    child: Text('전송'),
+                    child: Text(
+                      '전송',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                   ),
                 ],
               );
@@ -729,13 +762,17 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFFFAFAFA),
           content: Text(message),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('확인'),
+              child: Text(
+                '확인',
+                style: TextStyle(color: Color(0xFFE48758)),
+              ),
             ),
           ],
         );
@@ -909,6 +946,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
+                backgroundColor: Color(0xFFFAFAFA),
                 title: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1132,12 +1170,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 accountName: Row(
                   children: [
                     Text(
-                        USER_NAME,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22.0,
-                          color: Color(0xFFF4EEE7),
-                        ),
+                      USER_NAME,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22.0,
+                        color: Color(0xFFF4EEE7),
+                      ),
                     ),
                     IconButton(
                       icon: Icon(Icons.copy_outlined,
@@ -1147,11 +1185,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             ClipboardData(text: USER_NAME)); // 이름 복사
                         ScaffoldMessenger.of(context).showSnackBar(
                           // 복사 완료 알림
-                          SnackBar(content: Text('이름이 복사되었습니다')),
+                          SnackBar(
+                              content: Text(
+                            '이름이 복사되었습니다',
+                            style: TextStyle(color: Color(0xFFE48758)),
+                          )),
                         );
                       },
                     ),
-                    SizedBox(width: 68,),
+                    SizedBox(
+                      width: 68,
+                    ),
                     IconButton(
                         onPressed: () async {
                           final prefs = await SharedPreferences.getInstance();
@@ -1182,7 +1226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Color(0xFFE48758),
                 ),
                 title: Text(
-                    '캘린더',
+                  '캘린더',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF939495),
@@ -1198,10 +1242,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Color(0xFFE48758),
                 ),
                 title: Text(
-                    '친구 목록',
+                  '친구 목록',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFE48758),
+                    color: Color(0xFF939495),
                   ),
                 ),
                 onTap: () {
@@ -1214,20 +1258,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Color(0xFFE48758),
                   ),
                   title: Text(
-                      '화상 통신',
+                    '화상 통신',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFE48758),
+                      color: Color(0xFF939495),
                     ),
                   ),
                   onTap: () {
                     _showFriendSelectionDialogForVideoCall();
-                  }
-              ),
+                  }),
             ],
           ),
         ),
-        backgroundColor: Color(0xFFF4EEE7),
+        backgroundColor: Color(0xFFFAFAFA),
         body: RefreshIndicator(
           backgroundColor: Color(0xFFFAFAFA),
           color: Color(0xFFE48758),
@@ -1259,24 +1302,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: InputDecoration(
                     hintText: '메모 검색',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
+                      borderRadius: BorderRadius.circular(15.0),
                       borderSide: BorderSide(
                         color: Color(0xFFE48758), // 기본 상태 테두리 색상
-                        width: 2.0, // 테두리 굵기
+                        width: 1.0, // 테두리 굵기
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
+                      borderRadius: BorderRadius.circular(15.0),
                       borderSide: BorderSide(
                         color: Color(0xFFE48758), // 기본 상태 테두리 색상
-                        width: 2.0, // 테두리 굵기
+                        width: 1.0, // 테두리 굵기
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0),
+                      borderRadius: BorderRadius.circular(15.0),
                       borderSide: BorderSide(
                         color: Color(0xFFE48758), // 포커스 상태 테두리 색상
-                        width: 2.0, // 테두리 굵기
+                        width: 1.0, // 테두리 굵기
                       ),
                     ),
                     suffixIcon:
@@ -1333,7 +1376,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderRadius: BorderRadius.circular(8.0),
                                 border: Border.all(
                                   color: isRead == 1
-                                      ? Colors.grey
+                                      ? Color(0xFFF4EEE7)
                                       : Colors.blueAccent,
                                   width: isRead == 1 ? 1.0 : 2.0,
                                 ),
@@ -1490,11 +1533,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         floatingActionButton: SizedBox(
-          width: 100.0, // 원하는 너비
-          height: 100.0, // 원하는 높이
+          width: 50.0, // 원하는 너비
+          height: 50.0, // 원하는 높이
           child: FloatingActionButton(
-            backgroundColor: Color(0xFFFAFAFA),
-            foregroundColor: Color(0xFFE48758),
+            backgroundColor: Color(0xFFE48758),
+            foregroundColor: Color(0xFFFAFAFA),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30.0),
             ),
