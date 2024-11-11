@@ -154,12 +154,16 @@ class FriendsListScreenState extends State<FriendsListScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFFFAFAFA),
           content: Text(message),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
               child: Text('확인'),
             ),
           ],
@@ -173,6 +177,7 @@ class FriendsListScreenState extends State<FriendsListScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFFFAFAFA),
           title: Text('친구 옵션'),
           actions: <Widget>[
             TextButton(
@@ -180,21 +185,26 @@ class FriendsListScreenState extends State<FriendsListScreen> {
                 Navigator.of(context).pop();
                 _kockFriend(friendUserName); // 콕 찌르기 기능 추가
               },
-              child: Text('콕'),
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
+              child: Text(
+                '콕',
+                style: TextStyle(color: Color(0xFFE48758)), // 텍스트 색상 직접 설정
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _showUpdateFriendDialog(friendUserName);
               },
-              child: Text('수정'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _showDeleteFriendDialog(friendUserName);
-              },
-              child: Text('삭제'),
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
+              child: Text(
+                '수정',
+                style: TextStyle(color: Color(0xFFE48758)), // 텍스트 색상 직접 설정
+              ),
             ),
           ],
         );
@@ -209,6 +219,7 @@ class FriendsListScreenState extends State<FriendsListScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFFFAFAFA),
           title: Text('친구 이름 수정'),
           content: TextField(
             controller: _newFriendController,
@@ -219,6 +230,9 @@ class FriendsListScreenState extends State<FriendsListScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
               child: Text('취소'),
             ),
             TextButton(
@@ -229,6 +243,9 @@ class FriendsListScreenState extends State<FriendsListScreen> {
                   Navigator.of(context).pop();
                 }
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
               child: Text('수정'),
             ),
           ],
@@ -242,6 +259,7 @@ class FriendsListScreenState extends State<FriendsListScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFFFAFAFA),
           title: Text('친구 삭제'),
           content: Text('친구를 삭제합니다'),
           actions: <Widget>[
@@ -249,6 +267,9 @@ class FriendsListScreenState extends State<FriendsListScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
               child: Text('취소'),
             ),
             TextButton(
@@ -256,6 +277,9 @@ class FriendsListScreenState extends State<FriendsListScreen> {
                 _deleteFriend(friendUserName);
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Color(0xFFE48758), // 버튼 텍스트 색상 설정
+              ),
               child: Text('삭제'),
             ),
           ],
@@ -294,62 +318,116 @@ class FriendsListScreenState extends State<FriendsListScreen> {
         FocusScope.of(context).unfocus(); // 키보드 내리기
       },
       child: Scaffold(
+        backgroundColor: Color(0xFFFAFAFA),
         appBar: AppBar(
           title: Text('친구 목록'),
+          backgroundColor: Color(0xFFFAFAFA),
         ),
         body: RefreshIndicator(
           onRefresh: _refreshFriends,
           child: Column(
             children: <Widget>[
-              SizedBox(height: 60.0), // 검색창을 아래로 내리기 위한 여백
+              SizedBox(height: 70.0), // 검색창을 아래로 내리기 위한 여백
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.only(bottom: 16.0), // 검색창과 리스트 사이의 간격
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: '이름 검색',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                          width: 3.0, // 테두리 굵기
+                padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                child: Container(
+                  width: MediaQuery.of(context).size.width *
+                      0.8, // 검색창 가로 크기를 90%로 설정
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.only(bottom: 16.0), // 검색창과 리스트 사이의 간격
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: '이름 검색',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15.0),
+                          borderSide: BorderSide(
+                            color: Color(0xFFE48758), // 기본 상태 테두리 색상
+                            width: 1.0, // 테두리 굵기
+                          ),
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Color(0xFFE2F1FF), // 기본 상태 테두리 색상
-                          width: 3.0, // 테두리 굵기
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15.0),
+                          borderSide: BorderSide(
+                            color: Color(0xFFE48758), // 기본 상태 테두리 색상
+                            width: 1.0, // 테두리 굵기
+                          ),
                         ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: BorderSide(
-                          color: Color(0xFFE2F1FF), // 포커스 상태 테두리 색상
-                          width: 3.0, // 테두리 굵기
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15.0),
+                          borderSide: BorderSide(
+                            color: Color(0xFFE48758), // 포커스 상태 테두리 색상
+                            width: 1.0, // 테두리 굵기
+                          ),
                         ),
+                        suffixIcon:
+                            Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                       ),
-                      suffixIcon:
-                          Icon(Icons.search, color: Colors.grey), // 검색 아이콘
                     ),
                   ),
                 ),
+              ),
+              SizedBox(
+                height: 30.0,
               ),
               Expanded(
                 child: ListView.builder(
                   itemCount: filteredFriends.length,
                   itemBuilder: (context, index) {
-                    return GestureDetector(
-                      child: ListTile(
-                        title: Text(filteredFriends[index]['user_name']!),
-                        onLongPress: () {
-                          _showActionDialog(
-                              filteredFriends[index]['user_name']!);
-                        },
-                      ),
+                    return Column(
+                      children: [
+                        Container(
+                          width: MediaQuery.of(context).size.width *
+                              0.8, // 라인을 80% 너비로 설정
+                          child: Divider(
+                            color: Color.fromARGB(255, 214, 214, 214), // 선 색상
+                            thickness: 1.0, // 선 두께
+                            height: 0.5, // 선 간격 줄이기
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              left: 50.0), // 왼쪽에 30px 마진 추가
+                          child: GestureDetector(
+                            child: Row(
+                              children: [
+                                // 동그라미 아이콘 추가
+                                CircleAvatar(
+                                  radius: 5.0, // 동그라미 크기
+                                  backgroundColor: Color(0xFFDDDDDD), // 동그라미 색상
+                                ),
+                                SizedBox(width: 10), // 동그라미와 텍스트 사이의 간격
+                                Expanded(
+                                  child: ListTile(
+                                    title: Text(
+                                        filteredFriends[index]['user_name']!),
+                                    onLongPress: () {
+                                      _showActionDialog(
+                                          filteredFriends[index]['user_name']!);
+                                    },
+                                    trailing: GestureDetector(
+                                      onTap: () {
+                                        _deleteFriend(filteredFriends[index]
+                                            ['user_name']!);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                            right: 30.0), // 오른쪽에 여백 추가
+                                        child: Image.asset(
+                                          'assets/images/trash.png', // trash.png 아이콘 이미지
+                                          width: 20.0, // 아이콘 크기 조정
+                                          height: 20.0, // 아이콘 크기 조정
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -357,14 +435,19 @@ class FriendsListScreenState extends State<FriendsListScreen> {
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            showAddFriendDialog();
-          },
-          child: Icon(Icons.add),
-          backgroundColor: Color(0xFFCDE9FF), // 버튼 배경 색상
-          shape: CircleBorder(), // 버튼 모양을 원으로 설정
-          elevation: 2.0, // 그림자 효과
+        floatingActionButton: SizedBox(
+          width: 50.0, // 버튼 너비
+          height: 50.0, // 버튼 높이
+          child: FloatingActionButton(
+            onPressed: () {
+              showAddFriendDialog();
+            },
+            child: Icon(Icons.add, size: 30.0), // 아이콘 크기
+            backgroundColor: Color(0xFFE48758),
+            foregroundColor: Color(0xFFFAFAFA),
+            shape: CircleBorder(), // 버튼 모양을 원으로 설정
+            elevation: 2.0, // 그림자 효과
+          ),
         ),
       ),
     );
@@ -377,6 +460,7 @@ class FriendsListScreenState extends State<FriendsListScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFFFAFAFA),
           title: Text('친구 추가'),
           content: TextField(
             controller: _newFriendController,
@@ -387,6 +471,9 @@ class FriendsListScreenState extends State<FriendsListScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(
+                  foregroundColor: Color(0xFFE48758) // 버튼 배경색
+                  ),
               child: Text('취소'),
             ),
             TextButton(
@@ -396,6 +483,10 @@ class FriendsListScreenState extends State<FriendsListScreen> {
                   Navigator.of(context).pop();
                 }
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Color(0xFFE48758),
+              ),
               child: Text('추가'),
             ),
           ],
