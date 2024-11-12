@@ -2264,6 +2264,10 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                         icon: Image.asset(
                                           'assets/images/summary.png',
                                           height: 20,
+                                          color:
+                                              _shouldShowSummaryRecommendation
+                                                  ? Color(0xFF4CFF76)
+                                                  : Colors.grey, // 활성화/비활성화 색상
                                         )),
                                   if (_shouldShowTranslationRecommendation)
                                     IconButton(
@@ -2271,12 +2275,19 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                         icon: Image.asset(
                                           'assets/images/translate.png',
                                           height: 20,
+                                          color:
+                                              _shouldShowTranslationRecommendation
+                                                  ? Color(0xFF65FBF9)
+                                                  : Colors.grey,
                                         )),
                                   if (_shouldShowVideoCallButton)
                                     IconButton(
                                       icon: Image.asset(
                                         'assets/images/video_call.png',
                                         height: 20,
+                                        color: _shouldShowVideoCallButton
+                                            ? Color(0xFFFF952C)
+                                            : Colors.grey, // 비슷한 방식으로 색상 처리
                                       ),
                                       onPressed:
                                           _handleTextInputForVideoCall, // 회의 시작 함수 호출
@@ -2287,6 +2298,9 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                       icon: Image.asset(
                                         'assets/images/classify.png',
                                         height: 20,
+                                        color: _shouldShowClassificationButton
+                                            ? Color(0xFFF8FF72)
+                                            : Colors.grey,
                                       ),
                                     ),
                                   IconButton(
@@ -2297,6 +2311,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                           'assets/images/insert_file.png'),
                                     ),
                                     onPressed: _pickImageOrFile,
+                                    color: Color(0xFF0073FF),
                                   ),
                                   IconButton(
                                     icon: SizedBox(
@@ -2321,6 +2336,7 @@ class _WriteMemoScreenState extends State<WriteMemoScreen> {
                                           Image.asset('assets/images/send.png'),
                                     ),
                                     onPressed: _saveAndShareMemo,
+                                    color: Color(0xFFB337F5),
                                   ),
                                 ],
                               ),
