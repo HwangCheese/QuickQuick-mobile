@@ -252,7 +252,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 });
                               }
                             },
-                            child: Text('날짜 선택'),
+                            child: Text(
+                              '날짜 선택',
+                              style: TextStyle(color: Color(0xFFE48758)),
+                            ),
                           ),
                         ],
                       ),
@@ -280,7 +283,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 });
                               }
                             },
-                            child: Text('시간 선택'),
+                            child: Text(
+                              '시간 선택',
+                              style: TextStyle(color: Color(0xFFE48758)),
+                            ),
                           ),
                         ],
                       ),
@@ -293,7 +299,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: Text('취소'),
+                  child: Text(
+                    '취소',
+                    style: TextStyle(color: Color(0xFFE48758)),
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -308,7 +317,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     addEvent(eventDateTime, descriptionController.text);
                     Navigator.of(context).pop();
                   },
-                  child: Text('추가'),
+                  child: Text(
+                    '추가',
+                    style: TextStyle(color: Color(0xFFE48758)),
+                  ),
                 ),
               ],
             );
@@ -323,17 +335,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('일정 추가 확인'),
-          content: Text('이 내용을 캘린더에 추가하시겠습니까?\n$line'),
+          title: Text(
+            '일정 추가 확인',
+            style: TextStyle(color: Color(0xFFE48758)),
+          ),
+          content: Text(
+            '이 내용을 캘린더에 추가하시겠습니까?\n$line',
+            style: TextStyle(color: Color(0xFFE48758)),
+          ),
           actions: <Widget>[
             TextButton(
-              child: Text('취소'),
+              child: Text(
+                '취소',
+                style: TextStyle(color: Color(0xFFE48758)),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: Text('추가'),
+              child: Text(
+                '추가',
+                style: TextStyle(color: Color(0xFFE48758)),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
                 _processEventLine(line); // _processEventLine 직접 호출
@@ -398,7 +422,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       builder: (context) {
         return AlertDialog(
           title: Text('일정 옵션'),
-          content: Text('일정을 수정하거나 삭제하시겠습니까?\n$eventDescription'),
+          content: Text(
+            '일정을 수정하거나 삭제하시겠습니까?\n$eventDescription',
+            style: TextStyle(color: Color(0xFFE48758)),
+          ),
           backgroundColor: Color(0xFFF4EEE7),
           actions: [
             TextButton(
@@ -407,7 +434,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _showEditEventDialog(date, eventDescription);
               },
               child: Text(
-                  '수정',
+                '수정',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Color(0xFFE48758),
@@ -420,7 +447,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _deleteEvent(date, eventDescription);
               },
               child: Text(
-                  '삭제',
+                '삭제',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Color(0xFFE48758),
@@ -478,7 +505,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               });
                             }
                           },
-                          child: Text('시간 선택'),
+                          child: Text(
+                            '시간 선택',
+                            style: TextStyle(color: Color(0xFFE48758)),
+                          ),
                         ),
                       ],
                     ),
@@ -490,7 +520,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: Text('취소'),
+                  child: Text(
+                    '취소',
+                    style: TextStyle(color: Color(0xFFE48758)),
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -506,7 +539,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     _updateEvent(
                         updatedDateTime, oldDescription, _controller.text);
                   },
-                  child: Text('저장'),
+                  child: Text(
+                    '저장',
+                    style: TextStyle(color: Color(0xFFE48758)),
+                  ),
                 ),
               ],
             );
@@ -533,7 +569,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       backgroundColor: Color(0xFFF4EEE7),
       body: Padding(
         padding: const EdgeInsets.only(
-            top: 100.0, left: 16.0, right: 16.0, bottom: 16.0),
+            top: 50.0, left: 16.0, right: 16.0, bottom: 16.0),
         child: Column(
           children: <Widget>[
             TableCalendar(
@@ -545,25 +581,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 rightChevronVisible: true,
                 leftChevronIcon: Icon(
                   Icons.chevron_left,
-                  size: 50,// 왼쪽 버튼 아이콘
+                  size: 40, // 왼쪽 버튼 아이콘
                   color: Color(0xFFE48758), // 왼쪽 버튼 색상 변경
                 ),
                 rightChevronIcon: Icon(
                   Icons.chevron_right,
-                  size: 50,// 오른쪽 버튼 아이콘
+                  size: 40, // 오른쪽 버튼 아이콘
                   color: Color(0xFFE48758), // 오른쪽 버튼 색상 변경
                 ),
                 titleTextStyle: TextStyle(
-                    fontSize: 40.0,
-                    color: Color(0xFFE48758),
-                    fontWeight: FontWeight.bold,
+                  fontSize: 30.0,
+                  color: Color(0xFFE48758),
+                  fontWeight: FontWeight.bold,
                 ),
-                headerMargin: const EdgeInsets.only(bottom: 30.0),
+                headerMargin: const EdgeInsets.only(bottom: 10.0),
               ),
               firstDay: DateTime.utc(2010, 10, 16),
               lastDay: DateTime.utc(2030, 3, 14),
               focusedDay: _focusedDay,
-              daysOfWeekHeight: 60,
+              daysOfWeekHeight: 40,
               selectedDayPredicate: (day) {
                 return isSameDay(_selectedDay, day);
               },
@@ -659,9 +695,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.black,
                 ),
                 todayDecoration: BoxDecoration(
-                  color: Colors.transparent,
                   shape: BoxShape.circle,
                   border: Border.all(color: Color(0xFFE48758), width: 1.5),
+                  color: Color(0xFFF4EEE7), // 오늘 날짜 배경 색상
                 ),
                 todayTextStyle: const TextStyle(
                   fontWeight: FontWeight.bold,
@@ -669,15 +705,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.black,
                 ),
                 selectedDecoration: BoxDecoration(
-                  color: Color(0xFFE48758),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Color(0xFFE48758), // 선택된 날짜의 테두리 색상
+                    width: 1.5, // 테두리 두께
+                  ),
+                  color: Color(0xFFE48758), // 선택된 날짜 배경 색상 (색상 추가)
                 ),
                 selectedTextStyle: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16.0, // 선택된 날짜 폰트 크기
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
-                cellMargin: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 30.0), // 날짜 셀의 상하 여백
+                cellMargin: const EdgeInsets.symmetric(
+                    vertical: 10.0, horizontal: 30.0), // 날짜 셀의 상하 여백
               ),
             ),
             SizedBox(height: 50),
@@ -691,7 +732,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       style: const TextStyle(
                         color: Color(0xFFE48758),
                         fontWeight: FontWeight.bold,
-                        fontSize: 30,
+                        fontSize: 20,
                       ),
                     ),
                   ],
@@ -719,15 +760,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           Text(
                             time,
                             style: const TextStyle(
-                              color: Color(0xFFE48758),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 25
-                            ),
+                                color: Color(0xFFE48758),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 25),
                           ),
                           const SizedBox(width: 40),
                           Expanded(
                             child: Text(
-                                description,
+                              description,
                               style: TextStyle(
                                 fontSize: 15,
                               ),
