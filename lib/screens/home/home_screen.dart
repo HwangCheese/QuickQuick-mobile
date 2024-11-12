@@ -330,6 +330,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // void _filterMemos() {
+  //   String query = _searchController.text.toLowerCase();
+
+  //   setState(() {
+  //     if (query.isEmpty) {
+  //       filteredMemos = memos;
+  //     } else {
+  //       filteredMemos = memos.where((memo) {
+  //         String memoId = memo['memo_id'];
+  //         String? memoText = memoTexts.containsKey(memoId)
+  //             ? memoTexts[memoId]!.trim().toLowerCase()
+  //             : "";
+
+  //         // memoText가 비어 있으면 검색 결과에서 제외
+  //         if (memoText.isEmpty) {
+  //           return false;
+  //         }
+
+  //         String memoTitle = memo['title'].toLowerCase();
+  //         // 특정 메모의 텍스트만을 검색어와 비교
+  //         return memoTitle.contains(query) || memoText.contains(query);
+  //       }).toList();
+  //     }
+  //   });
+  // }
+
   void _filterMemos() {
     String query = _searchController.text.toLowerCase();
 
@@ -496,7 +522,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           allSelected = !allSelected;
                         });
                       },
-                      child: Text(allSelected ? '선택 해제' : '전체 선택'),
+                      child: Text(
+                        allSelected ? '선택 해제' : '전체 선택',
+                        style: TextStyle(
+                          color: Color(0xFFE48758), // 텍스트 색상 설정
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -603,7 +634,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           allSelected = !allSelected;
                         });
                       },
-                      child: Text(allSelected ? '선택 해제' : '전체 선택'),
+                      child: Text(
+                        allSelected ? '선택 해제' : '전체 선택',
+                        style: TextStyle(
+                          color: Color(0xFFE48758), // 텍스트 색상 설정
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -964,7 +1000,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           allSelected = !allSelected;
                         });
                       },
-                      child: Text(allSelected ? '선택 해제' : '전체 선택'),
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: selectedFriendIds.isEmpty
+                            ? Color(0xFFFAFAFA) // 선택 해제 색상
+                            : Color(0xFFE48758), // 눌렀을 때 텍스트 색상
+                      ),
+                      child: Text(
+                        allSelected ? '선택 해제' : '전체 선택',
+                        style: TextStyle(
+                          color: Color(0xFFE48758), // 텍스트 색상 설정
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -978,6 +1025,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: Text(friends[index]['user_name']!),
                         value: selectedFriendIds
                             .contains(friends[index]['user_id']),
+                        activeColor: Color(0xFFE48758), // 바깥쪽 색상 설정
+                        checkColor: Colors.white, // 안쪽 체크 색상 설정
                         onChanged: (bool? value) {
                           setState(() {
                             if (value == true) {
@@ -997,7 +1046,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () {
                       Navigator.of(context).pop(); // 팝업 닫기
                     },
-                    child: Text('취소'),
+                    child: Text(
+                      '취소',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                   ),
                   TextButton(
                     onPressed: () {
@@ -1012,7 +1064,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       );
                     },
-                    child: Text('초대'),
+                    child: Text(
+                      '초대',
+                      style: TextStyle(color: Color(0xFFE48758)),
+                    ),
                   ),
                 ],
               );
@@ -1296,7 +1351,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 TextField(
                   controller: _searchController,
-                  onChanged: (value) {
+                  onSubmitted: (value) {
                     _filterMemos(); // 검색어 변경 시 필터링 함수 호출
                   },
                   decoration: InputDecoration(
