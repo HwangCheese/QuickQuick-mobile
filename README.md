@@ -14,11 +14,11 @@
 <br>
 
 ## 🧑‍🤝‍🧑 멤버 구성
- - 팀장 : [하여린](https://github.com/niroey) - 모바일 앱 구현
- - 팀원1 : [전아린](https://github.com/flsrinn) - 모바일 앱 구현
- - 팀원2 : [윤단비](https://github.com/yoondanbi) - PC 앱 구현
- - 팀원3 : [김은비](https://github.com/ssilverrain) - PC 앱 구현
- - 팀원4 : [이동건](https://github.com/mvg01) - 서버 구현 및 DB 구축
+ - [김은비](https://github.com/ssilverrain) - PC 앱 구현
+ - [윤단비](https://github.com/yoondanbi) - PC 앱 구현
+ - [이동건](https://github.com/mvg01) - 서버 구현 및 DB 구축
+ - [전아린](https://github.com/flsrinn) - 모바일 앱 구현
+ - [하여린](https://github.com/niroey) - 모바일 앱 구현
 <br>
 
  ## ⚙️ 개발 환경
